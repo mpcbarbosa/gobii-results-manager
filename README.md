@@ -174,15 +174,59 @@ gobii-results-manager_clean/
 - Execute o terminal como Administrador
 - Ou use: `npm run db:migrate -- --skip-generate`
 
+## Modelo de Dados (Milestone 1)
+
+O sistema utiliza um schema PostgreSQL production-grade com as seguintes entidades:
+
+### Entidades Principais
+
+| Entidade | Descrição | Características |
+|----------|-----------|-----------------|
+| **sources** | Agentes Gobii (scanners, scorers) | Rastreamento de origem dos leads |
+| **accounts** | Empresas/Organizações | Deduplicação via `name_normalized` e `domain` |
+| **leads** | Instâncias de leads | Deduplicação via `dedupe_key` (SHA256) |
+| **scoring_runs** | Histórico de scoring | Auditoria completa de scores |
+| **users** | Equipa interna | RBAC com 4 roles |
+| **lead_assignments** | Ownership temporal | Rastreamento de responsabilidade |
+| **lead_status_history** | Pipeline de estados | Audit trail completo |
+| **contacts** | Pessoas nas empresas | CRM-light |
+| **interactions** | Chamadas, emails, reuniões | Tracking de engagement |
+| **handoffs** | Transição para marketing/sales | Workflow de aprovação |
+
+### Características do Schema
+
+- ✅ **UUID** como primary key em todas as tabelas
+- ✅ **Soft delete** (`deleted_at`) em accounts, leads, contacts
+- ✅ **Timestamps** automáticos (`created_at`, `updated_at`)
+- ✅ **Foreign keys** explícitas com cascades controladas
+- ✅ **Índices estratégicos** para queries frequentes
+- ✅ **Enums** para valores controlados (UserRole, LeadStatus, etc.)
+- ✅ **Campos normalizados** para deduplicação eficiente
+- ✅ **Integridade referencial** rigorosa
+
+### Enums Disponíveis
+
+- `UserRole`: ADMIN, OPERATIONS_LEAD, OPERATOR, VIEWER
+- `LeadStatus`: NEW, REVIEWING, QUALIFIED, DISQUALIFIED, CONTACTED, ENGAGED, NURTURING, READY_HANDOFF, HANDED_OFF, ARCHIVED
+- `InteractionChannel`: PHONE, EMAIL, LINKEDIN, MEETING, WHATSAPP, OTHER
+- `InteractionOutcome`: SUCCESSFUL, NO_ANSWER, VOICEMAIL, WRONG_CONTACT, NOT_INTERESTED, CALLBACK_LATER, MEETING_BOOKED, INFO_SENT, OTHER
+- `HandoffTeam`: MARKETING, SALES, PARTNERSHIPS, CUSTOMER_SUCCESS
+- `HandoffStatus`: PENDING, ACCEPTED, REJECTED, COMPLETED, CANCELLED
+
+Para mais detalhes, consulte [`prisma/schema.prisma`](prisma/schema.prisma).
+
 ## Próximos Passos
 
-Este é o **Milestone 0: Foundation**. Os próximos milestones incluirão:
+Este projeto completou:
+- ✅ **Milestone 0**: Foundation (Next.js, Prisma, Tailwind, shadcn/ui)
+- ✅ **Milestone 1**: Core Database Schema (modelo de dados completo)
 
-1. **Milestone 1**: Schema completo da base de dados
-2. **Milestone 2**: Sistema de autenticação e autorização
-3. **Milestone 3**: Workflow Engine
-4. **Milestone 4**: Results Management
-5. **Milestone 5**: Analytics e Reporting
+Os próximos milestones incluirão:
+
+1. **Milestone 2**: Sistema de autenticação e autorização
+2. **Milestone 3**: APIs REST para gestão de leads
+3. **Milestone 4**: Interface de utilizador (dashboards, listas, formulários)
+4. **Milestone 5**: Analytics e Reporting
 
 ## Suporte
 

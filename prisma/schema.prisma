@@ -1,5 +1,13 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// Gobii Results Manager - Core Database Schema
+// Milestone 1: Production-grade data model
+// 
+// Design Principles:
+// - UUID primary keys for distributed systems compatibility
+// - Soft deletes for data retention and audit
+// - Explicit foreign keys with controlled cascades
+// - Strategic indexes for query performance
+// - Normalized fields for deduplication
+// - Comprehensive audit trail
 
 generator client {
   provider = "prisma-client-js"
@@ -10,11 +18,426 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Placeholder model - will be expanded in Milestone 1
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  ADMIN           // Full system access
+  OPERATIONS_LEAD // Lead operations manager
+  OPERATOR        // Standard operator
+  VIEWER          // Read-only access
+}
+
+enum LeadStatus {
+  NEW             // Initial state from source
+  REVIEWING       // Under review by operator
+  QUALIFIED       // Meets qualification criteria
+  DISQUALIFIED    // Does not meet criteria
+  CONTACTED       // Initial contact made
+  ENGAGED         // Active engagement
+  NURTURING       // Long-term nurture
+  READY_HANDOFF   // Ready for marketing/sales
+  HANDED_OFF      // Transferred to next team
+  ARCHIVED        // No longer active
+}
+
+enum InteractionChannel {
+  PHONE           // Phone call
+  EMAIL           // Email communication
+  LINKEDIN        // LinkedIn message
+  MEETING         // In-person or virtual meeting
+  WHATSAPP        // WhatsApp message
+  OTHER           // Other channels
+}
+
+enum InteractionOutcome {
+  SUCCESSFUL      // Positive outcome
+  NO_ANSWER       // No response
+  VOICEMAIL       // Left voicemail
+  WRONG_CONTACT   // Wrong person/number
+  NOT_INTERESTED  // Explicitly not interested
+  CALLBACK_LATER  // Requested callback
+  MEETING_BOOKED  // Meeting scheduled
+  INFO_SENT       // Information sent
+  OTHER           // Other outcomes
+}
+
+enum HandoffTeam {
+  MARKETING       // Marketing team
+  SALES           // Sales team
+  PARTNERSHIPS    // Partnerships team
+  CUSTOMER_SUCCESS // Customer success team
+}
+
+enum HandoffStatus {
+  PENDING         // Awaiting acceptance
+  ACCEPTED        // Accepted by receiving team
+  REJECTED        // Rejected by receiving team
+  COMPLETED       // Handoff completed
+  CANCELLED       // Handoff cancelled
+}
+
+// ============================================================================
+// CORE ENTITIES
+// ============================================================================
+
+// Sources: Gobii agents (scanners, scorers) that generate leads
+model Source {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique // e.g., "LinkedIn Scanner", "Email Scorer"
+  type        String   // e.g., "scanner", "scorer", "enricher"
+  description String?
+  isActive    Boolean  @default(true)
+  config      Json?    // Source-specific configuration
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  leads       Lead[]
+  scoringRuns ScoringRun[]
+
+  @@index([isActive])
+  @@map("sources")
+}
+
+// Accounts: Companies/Organizations (with deduplication support)
+model Account {
+  id                String    @id @default(uuid()) @db.Uuid
+  name              String    // Company name
+  nameNormalized    String    @map("name_normalized") // Lowercase, trimmed for deduplication
+  domain            String?   @unique // Primary domain (e.g., "example.com")
+  website           String?
+  industry          String?
+  size              String?   // e.g., "1-10", "11-50", "51-200"
+  location          String?
+  country           String?
+  description       String?   @db.Text
+  linkedinUrl       String?   @map("linkedin_url")
+  metadata          Json?     // Additional flexible data
+  
+  // Soft delete
+  deletedAt         DateTime? @map("deleted_at")
+  
+  // Audit
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  leads             Lead[]
+  contacts          Contact[]
+
+  @@index([nameNormalized])
+  @@index([domain])
+  @@index([deletedAt])
+  @@map("accounts")
+}
+
+// Leads: Individual lead instances with deduplication
+model Lead {
+  id                String    @id @default(uuid()) @db.Uuid
+  
+  // Deduplication
+  dedupeKey         String    @unique @map("dedupe_key") // SHA256 hash for deduplication
+  
+  // Source tracking
+  sourceId          String    @map("source_id") @db.Uuid
+  source            Source    @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  
+  // Account relationship
+  accountId         String    @map("account_id") @db.Uuid
+  account           Account   @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  
+  // Lead data
+  title             String?   // Job title
+  seniority         String?   // e.g., "C-Level", "VP", "Manager"
+  department        String?   // e.g., "Engineering", "Sales"
+  
+  // Scoring
+  score             Float?    // Latest score (0-100)
+  scoreDetails      Json?     @map("score_details") // Detailed scoring breakdown
+  
+  // Status
+  status            LeadStatus @default(NEW)
+  statusReason      String?    @map("status_reason") @db.Text // Reason for status change
+  
+  // Priority
+  priority          Int       @default(0) // Higher = more priority
+  
+  // Metadata
+  rawData           Json?     @map("raw_data") // Original data from source
+  enrichedData      Json?     @map("enriched_data") // Additional enrichment data
+  tags              String[]  @default([])
+  
+  // Soft delete
+  deletedAt         DateTime? @map("deleted_at")
+  
+  // Audit
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  assignments       LeadAssignment[]
+  statusHistory     LeadStatusHistory[]
+  scoringRuns       ScoringRun[]
+  interactions      Interaction[]
+  handoffs          Handoff[]
+
+  @@index([sourceId])
+  @@index([accountId])
+  @@index([status])
+  @@index([priority])
+  @@index([score])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("leads")
+}
+
+// Scoring Runs: Historical record of scoring operations
+model ScoringRun {
+  id          String   @id @default(uuid()) @db.Uuid
+  
+  // Source and lead
+  sourceId    String   @map("source_id") @db.Uuid
+  source      Source   @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  
+  leadId      String   @map("lead_id") @db.Uuid
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  // Scoring details
+  score       Float    // Score value (0-100)
+  scoreData   Json     @map("score_data") // Detailed scoring data
+  version     String   // Scoring algorithm version
+  
+  // Audit
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([leadId])
+  @@index([sourceId])
+  @@index([createdAt])
+  @@map("scoring_runs")
+}
+
+// Users: Internal team members
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(uuid()) @db.Uuid
+  email       String   @unique
+  name        String
+  role        UserRole @default(OPERATOR)
+  isActive    Boolean  @default(true) @map("is_active")
+  
+  // Profile
+  avatar      String?
+  phone       String?
+  timezone    String?  @default("UTC")
+  
+  // Audit
+  lastLoginAt DateTime? @map("last_login_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  assignments       LeadAssignment[]
+  statusChanges     LeadStatusHistory[]
+  interactions      Interaction[]
+  handoffsCreated   Handoff[] @relation("HandoffCreatedBy")
+  handoffsAccepted  Handoff[] @relation("HandoffAcceptedBy")
+
+  @@index([email])
+  @@index([role])
+  @@index([isActive])
+  @@map("users")
+}
+
+// Lead Assignments: Temporal ownership of leads
+model LeadAssignment {
+  id          String    @id @default(uuid()) @db.Uuid
+  
+  // Lead and user
+  leadId      String    @map("lead_id") @db.Uuid
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  userId      String    @map("user_id") @db.Uuid
+  user        User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  
+  // Assignment period
+  assignedAt  DateTime  @default(now()) @map("assigned_at")
+  unassignedAt DateTime? @map("unassigned_at")
+  
+  // Metadata
+  reason      String?   @db.Text // Reason for assignment
+  notes       String?   @db.Text
+
+  @@index([leadId])
+  @@index([userId])
+  @@index([assignedAt])
+  @@index([unassignedAt])
+  @@map("lead_assignments")
+}
+
+// Lead Status History: Complete audit trail of status changes
+model LeadStatusHistory {
+  id          String     @id @default(uuid()) @db.Uuid
+  
+  // Lead
+  leadId      String     @map("lead_id") @db.Uuid
+  lead        Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  // Status change
+  fromStatus  LeadStatus? @map("from_status") // null for initial status
+  toStatus    LeadStatus  @map("to_status")
+  reason      String?     @db.Text
+  notes       String?     @db.Text
+  
+  // Changed by
+  changedById String     @map("changed_by_id") @db.Uuid
+  changedBy   User       @relation(fields: [changedById], references: [id], onDelete: Restrict)
+  
+  // Audit
+  changedAt   DateTime   @default(now()) @map("changed_at")
+
+  @@index([leadId])
+  @@index([changedById])
+  @@index([changedAt])
+  @@index([toStatus])
+  @@map("lead_status_history")
+}
+
+// Contacts: People at companies
+model Contact {
+  id                String    @id @default(uuid()) @db.Uuid
+  
+  // Account relationship
+  accountId         String    @map("account_id") @db.Uuid
+  account           Account   @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  
+  // Personal info
+  firstName         String    @map("first_name")
+  lastName          String    @map("last_name")
+  fullName          String    @map("full_name") // Computed: firstName + lastName
+  email             String?
+  phone             String?
+  
+  // Professional info
+  title             String?
+  department        String?
+  seniority         String?
+  
+  // Social
+  linkedinUrl       String?   @map("linkedin_url")
+  
+  // Status
+  isPrimary         Boolean   @default(false) @map("is_primary") // Primary contact for account
+  
+  // Metadata
+  notes             String?   @db.Text
+  metadata          Json?
+  
+  // Soft delete
+  deletedAt         DateTime? @map("deleted_at")
+  
+  // Audit
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  interactions      Interaction[]
+
+  @@index([accountId])
+  @@index([email])
+  @@index([fullName])
+  @@index([isPrimary])
+  @@index([deletedAt])
+  @@map("contacts")
+}
+
+// Interactions: CRM-light tracking (calls, emails, meetings)
+model Interaction {
+  id          String              @id @default(uuid()) @db.Uuid
+  
+  // Lead relationship
+  leadId      String              @map("lead_id") @db.Uuid
+  lead        Lead                @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  // Contact relationship (optional)
+  contactId   String?             @map("contact_id") @db.Uuid
+  contact     Contact?            @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  
+  // Interaction details
+  channel     InteractionChannel
+  outcome     InteractionOutcome?
+  subject     String?
+  notes       String?             @db.Text
+  duration    Int?                // Duration in minutes (for calls/meetings)
+  
+  // Scheduled vs completed
+  scheduledAt DateTime?           @map("scheduled_at")
+  completedAt DateTime?           @map("completed_at")
+  
+  // Performed by
+  userId      String              @map("user_id") @db.Uuid
+  user        User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  
+  // Metadata
+  metadata    Json?
+  
+  // Audit
+  createdAt   DateTime            @default(now()) @map("created_at")
+  updatedAt   DateTime            @updatedAt @map("updated_at")
+
+  @@index([leadId])
+  @@index([contactId])
+  @@index([userId])
+  @@index([channel])
+  @@index([outcome])
+  @@index([scheduledAt])
+  @@index([completedAt])
+  @@index([createdAt])
+  @@map("interactions")
+}
+
+// Handoffs: Transition to marketing/sales teams
+model Handoff {
+  id            String        @id @default(uuid()) @db.Uuid
+  
+  // Lead relationship
+  leadId        String        @map("lead_id") @db.Uuid
+  lead          Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  // Handoff details
+  toTeam        HandoffTeam   @map("to_team")
+  status        HandoffStatus @default(PENDING)
+  
+  // Context
+  reason        String        @db.Text // Why this lead is being handed off
+  notes         String?       @db.Text
+  priority      Int           @default(0)
+  
+  // Metadata
+  metadata      Json?         // Additional context (e.g., meeting notes, qualification details)
+  
+  // Created by
+  createdById   String        @map("created_by_id") @db.Uuid
+  createdBy     User          @relation("HandoffCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  
+  // Accepted/rejected by
+  acceptedById  String?       @map("accepted_by_id") @db.Uuid
+  acceptedBy    User?         @relation("HandoffAcceptedBy", fields: [acceptedById], references: [id], onDelete: Restrict)
+  
+  // Timestamps
+  createdAt     DateTime      @default(now()) @map("created_at")
+  acceptedAt    DateTime?     @map("accepted_at")
+  rejectedAt    DateTime?     @map("rejected_at")
+  completedAt   DateTime?     @map("completed_at")
+  
+  // Rejection reason
+  rejectionReason String?     @map("rejection_reason") @db.Text
+
+  @@index([leadId])
+  @@index([toTeam])
+  @@index([status])
+  @@index([createdById])
+  @@index([acceptedById])
+  @@index([createdAt])
+  @@map("handoffs")
 }
