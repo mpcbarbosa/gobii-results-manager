@@ -153,7 +153,7 @@ async function processLead(sourceId: string, leadInput: LeadInput): Promise<stri
   });
   
   // Upsert Contact if email provided
-  let contactId: string | undefined;
+  let _contactId: string | undefined; // Reserved for future use
   if (leadInput.contact?.email) {
     const normalizedEmail = normalizeEmail(leadInput.contact.email);
     
@@ -190,7 +190,7 @@ async function processLead(sourceId: string, leadInput: LeadInput): Promise<stri
       });
     }
     
-    contactId = contact.id;
+    _contactId = contact.id;
   }
   
   // Check if lead exists
