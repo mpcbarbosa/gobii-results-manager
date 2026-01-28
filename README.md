@@ -365,17 +365,288 @@ curl -X POST http://localhost:3000/api/ingest/leads \
 - ✅ **Histórico completo**: Cria ScoringRun e LeadStatusHistory
 - ✅ **Validação robusta**: Zod schemas para validação de payload
 
+### Leads Query API (Read)
+
+Endpoints para consultar e listar leads (requer `APP_READ_TOKEN`).
+
+#### GET /api/leads
+
+Lista leads com paginação, filtros e ordenação.
+
+**Autenticação:** Bearer token via header `Authorization`
+
+**Headers:**
+```
+Authorization: Bearer YOUR_APP_READ_TOKEN
+```
+
+**Query Parameters:**
+
+| Parâmetro | Tipo | Default | Descrição |
+|-----------|------|---------|-----------|
+| `page` | number | 1 | Número da página |
+| `pageSize` | number | 25 | Itens por página (max 100) |
+| `sort` | string | created_at | Campo de ordenação: `created_at`, `updated_at`, `score`, `probability` |
+| `order` | string | desc | Ordem: `asc` ou `desc` |
+| `status` | string | - | Filtro por status (pode ser múltiplo: `NEW,QUALIFIED`) |
+| `source` | string | - | Filtro por source key |
+| `minScore` | number | - | Score mínimo (0-100) |
+| `maxScore` | number | - | Score máximo (0-100) |
+| `minProbability` | number | - | Probabilidade mínima (0-1) |
+| `maxProbability` | number | - | Probabilidade máxima (0-1) |
+| `country` | string | - | Filtro por país da empresa |
+| `q` | string | - | Pesquisa textual (nome empresa, trigger, email) |
+| `assignedTo` | string | - | UUID do utilizador atribuído |
+| `unassigned` | boolean | - | Filtrar leads não atribuídos |
+| `handoffStatus` | string | - | Filtro por status de handoff |
+| `from` | string | - | Data inicial (ISO 8601) |
+| `to` | string | - | Data final (ISO 8601) |
+
+**Exemplo cURL:**
+```bash
+curl -X GET "http://localhost:3000/api/leads?page=1&pageSize=10&status=NEW,QUALIFIED&sort=score&order=desc" \
+  -H "Authorization: Bearer your-read-token"
+```
+
+**Exemplo PowerShell:**
+```powershell
+$headers = @{
+    "Authorization" = "Bearer your-read-token"
+}
+$response = Invoke-RestMethod -Uri "http://localhost:3000/api/leads?page=1&pageSize=10" -Headers $headers
+$response.items | Format-Table
+```
+
+**Resposta:**
+```json
+{
+  "items": [
+    {
+      "lead": {
+        "id": "uuid",
+        "createdAt": "2026-01-28T10:00:00Z",
+        "updatedAt": "2026-01-28T10:00:00Z",
+        "status": "NEW",
+        "trigger": "Implementação SAP S/4HANA",
+        "probability": 0.85,
+        "scoreTrigger": 70,
+        "scoreProbability": 17,
+        "scoreFinal": 87,
+        "summary": "Empresa em migração SAP",
+        "priority": 8,
+        "tags": ["high-value"]
+      },
+      "company": {
+        "accountId": "uuid",
+        "accountName": "Empresa Exemplo",
+        "domain": "exemplo.pt",
+        "country": "PT",
+        "industry": "Manufacturing",
+        "size": "50-200"
+      },
+      "source": {
+        "sourceId": "uuid",
+        "sourceKey": "SAPS4HANAScanner",
+        "sourceType": "scanner"
+      },
+      "primaryContact": {
+        "contactId": "uuid",
+        "name": "João Silva",
+        "email": "joao@exemplo.pt",
+        "phone": "+351912345678",
+        "role": "CTO"
+      },
+      "assignment": {
+        "assignedToUserId": "uuid",
+        "assignedToName": "Operator One",
+        "assignedToEmail": "operator1@gobii.com",
+        "assignedAt": "2026-01-28T10:00:00Z"
+      },
+      "lastInteraction": {
+        "interactionId": "uuid",
+        "lastInteractionAt": "2026-01-28T11:00:00Z",
+        "lastInteractionChannel": "EMAIL",
+        "lastInteractionOutcome": "INFO_SENT"
+      },
+      "handoff": null,
+      "scoring": {
+        "latestScore": 87,
+        "scoringVersion": "v1.0",
+        "scoredAt": "2026-01-28T10:00:00Z"
+      }
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "pageSize": 10,
+    "total": 42,
+    "totalPages": 5
+  },
+  "filters": {
+    "status": "NEW,QUALIFIED",
+    "source": null,
+    "minScore": null,
+    "maxScore": null,
+    "country": null,
+    "q": null
+  },
+  "sort": {
+    "field": "score",
+    "order": "desc"
+  }
+}
+```
+
+#### GET /api/leads/{id}
+
+Obtém detalhe completo de um lead específico.
+
+**Autenticação:** Bearer token via header `Authorization`
+
+**Exemplo cURL:**
+```bash
+curl -X GET "http://localhost:3000/api/leads/{lead-uuid}" \
+  -H "Authorization: Bearer your-read-token"
+```
+
+**Exemplo PowerShell:**
+```powershell
+$headers = @{
+    "Authorization" = "Bearer your-read-token"
+}
+$leadId = "your-lead-uuid"
+$response = Invoke-RestMethod -Uri "http://localhost:3000/api/leads/$leadId" -Headers $headers
+$response | ConvertTo-Json -Depth 10
+```
+
+**Resposta:**
+```json
+{
+  "lead": {
+    "id": "uuid",
+    "dedupeKey": "sha256-hash",
+    "externalId": "optional-external-id",
+    "createdAt": "2026-01-28T10:00:00Z",
+    "updatedAt": "2026-01-28T10:00:00Z",
+    "status": "QUALIFIED",
+    "statusReason": "Meets qualification criteria",
+    "priority": 8,
+    "tags": ["high-value", "enterprise"],
+    "trigger": "Implementação SAP S/4HANA",
+    "summary": "Empresa em processo de migração",
+    "probability": 0.85,
+    "scoreTrigger": 70,
+    "scoreProbability": 17,
+    "scoreFinal": 87,
+    "title": "CTO",
+    "seniority": "C-Level",
+    "department": "Engineering"
+  },
+  "source": {
+    "id": "uuid",
+    "name": "SAPS4HANAScanner",
+    "type": "scanner",
+    "description": "Scanner for SAP S/4HANA implementations"
+  },
+  "account": {
+    "id": "uuid",
+    "name": "Empresa Exemplo Lda",
+    "domain": "exemplo.pt",
+    "website": "https://exemplo.pt",
+    "industry": "Manufacturing",
+    "size": "50-200",
+    "location": "Porto",
+    "country": "PT",
+    "description": "Leading manufacturer",
+    "linkedinUrl": "https://linkedin.com/company/exemplo"
+  },
+  "contacts": [
+    {
+      "id": "uuid",
+      "fullName": "João Silva",
+      "email": "joao@exemplo.pt",
+      "phone": "+351912345678",
+      "title": "CTO",
+      "department": "Engineering",
+      "seniority": "C-Level",
+      "linkedinUrl": "https://linkedin.com/in/joaosilva",
+      "isPrimary": true
+    }
+  ],
+  "statusHistory": [
+    {
+      "id": "uuid",
+      "fromStatus": "NEW",
+      "toStatus": "QUALIFIED",
+      "reason": "Meets qualification criteria",
+      "notes": "High score and good fit",
+      "changedAt": "2026-01-28T10:30:00Z",
+      "changedBy": {
+        "id": "uuid",
+        "name": "Operator One",
+        "email": "operator1@gobii.com"
+      }
+    }
+  ],
+  "scoringRuns": [
+    {
+      "id": "uuid",
+      "score": 87,
+      "scoreData": {...},
+      "version": "v1.0",
+      "createdAt": "2026-01-28T10:00:00Z"
+    }
+  ],
+  "interactions": [
+    {
+      "id": "uuid",
+      "channel": "EMAIL",
+      "outcome": "INFO_SENT",
+      "subject": "Introduction to Gobii",
+      "notes": "Sent case studies",
+      "duration": null,
+      "scheduledAt": null,
+      "completedAt": "2026-01-28T11:00:00Z",
+      "createdAt": "2026-01-28T11:00:00Z",
+      "contact": {...},
+      "user": {...}
+    }
+  ],
+  "assignments": [
+    {
+      "id": "uuid",
+      "assignedAt": "2026-01-28T10:00:00Z",
+      "unassignedAt": null,
+      "reason": "High priority lead",
+      "notes": "Focus on enterprise value",
+      "user": {...}
+    }
+  ],
+  "handoffs": []
+}
+```
+
+**Características da API de Leitura:**
+- ✅ **Paginação eficiente**: Suporta até 100 itens por página
+- ✅ **Filtros múltiplos**: Combina vários filtros numa única query
+- ✅ **Ordenação flexível**: Por data, score ou probabilidade
+- ✅ **Pesquisa textual**: Busca em múltiplos campos
+- ✅ **Includes otimizados**: Evita N+1 queries
+- ✅ **Soft delete aware**: Exclui automaticamente registos apagados
+- ✅ **Detalhe completo**: Endpoint dedicado com histórico completo
+
 ## Próximos Passos
 
 Este projeto completou:
 - ✅ **Milestone 0**: Foundation (Next.js, Prisma, Tailwind, shadcn/ui)
 - ✅ **Milestone 1**: Core Database Schema (modelo de dados completo)
 - ✅ **Milestone 2**: Ingestion API (endpoint idempotente para leads)
+- ✅ **Milestone 3A**: Leads Query API (leitura com paginação e filtros)
 
 Os próximos milestones incluirão:
 
-1. **Milestone 3**: Sistema de autenticação e autorização (NextAuth.js)
-2. **Milestone 4**: APIs REST para gestão de leads (CRUD completo)
+1. **Milestone 3B**: Leads Mutation API (update, delete, assign)
+2. **Milestone 4**: Sistema de autenticação e autorização (NextAuth.js)
 3. **Milestone 5**: Interface de utilizador (dashboards, listas, formulários)
 4. **Milestone 6**: Analytics e Reporting
 
