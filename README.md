@@ -19,10 +19,10 @@ Antes de começar, certifique-se de ter instalado:
    - Download: https://nodejs.org/
    - Verifique a instalação: `node --version` e `npm --version`
 
-2. **PostgreSQL 15 ou superior**
-   - Download: https://www.postgresql.org/download/windows/
-   - Durante a instalação, anote a senha do utilizador `postgres`
-   - Verifique a instalação: `psql --version`
+2. **Docker Desktop** (recomendado para desenvolvimento)
+   - Download: https://www.docker.com/products/docker-desktop/
+   - Verifique a instalação: `docker --version` e `docker compose version`
+   - **OU** PostgreSQL 15+ instalado localmente (ver secção alternativa abaixo)
 
 3. **Git** (opcional, mas recomendado)
    - Download: https://git-scm.com/download/win
@@ -44,12 +44,49 @@ npm install
 
 ### 3. Configure a base de dados PostgreSQL
 
-#### Opção A: Usando pgAdmin (GUI)
-1. Abra o pgAdmin
-2. Crie uma nova base de dados chamada `gobii_results_manager`
-3. Anote o host, porta, utilizador e senha
+#### Opção A: Usando Docker (Recomendado) 🐳
 
-#### Opção B: Usando linha de comandos
+Inicie o PostgreSQL via Docker Compose:
+
+```bash
+# Inicie o container PostgreSQL em background
+docker compose up -d
+
+# Verifique se está a correr
+docker compose ps
+
+# Ver logs (opcional)
+docker compose logs -f postgres
+```
+
+O PostgreSQL estará disponível em `localhost:5432` com:
+- Database: `gobii`
+- User: `postgres`
+- Password: `postgres`
+
+**Comandos úteis:**
+```bash
+# Parar o container (mantém os dados)
+docker compose stop
+
+# Parar e remover o container (mantém os dados no volume)
+docker compose down
+
+# Remover tudo incluindo dados (⚠️ cuidado!)
+docker compose down -v
+
+# Reiniciar o container
+docker compose restart
+```
+
+#### Opção B: PostgreSQL instalado localmente
+
+Se preferir instalar PostgreSQL diretamente no Windows:
+
+1. Download: https://www.postgresql.org/download/windows/
+2. Durante a instalação, anote a senha do utilizador `postgres`
+3. Crie a base de dados:
+
 ```bash
 # Conecte-se ao PostgreSQL
 psql -U postgres
@@ -69,8 +106,14 @@ Copie o ficheiro `.env.example` para `.env`:
 copy .env.example .env
 ```
 
-Edite o ficheiro `.env` e atualize a `DATABASE_URL` com as suas credenciais:
+Edite o ficheiro `.env` e configure a `DATABASE_URL`:
 
+**Para Docker (recomendado):**
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/gobii?schema=public"
+```
+
+**Para PostgreSQL local:**
 ```env
 DATABASE_URL="postgresql://postgres:SUA_SENHA@localhost:5432/gobii_results_manager?schema=public"
 ```
@@ -78,11 +121,6 @@ DATABASE_URL="postgresql://postgres:SUA_SENHA@localhost:5432/gobii_results_manag
 **Formato da DATABASE_URL:**
 ```
 postgresql://[UTILIZADOR]:[SENHA]@[HOST]:[PORTA]/[NOME_DB]?schema=public
-```
-
-Exemplo:
-```
-DATABASE_URL="postgresql://postgres:minhasenha123@localhost:5432/gobii_results_manager?schema=public"
 ```
 
 ### 5. Execute as migrations do Prisma
