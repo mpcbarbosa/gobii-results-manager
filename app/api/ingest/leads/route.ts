@@ -1,0 +1,292 @@
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/prisma';
+import { ingestBatchSchema, type LeadInput } from '@/lib/validators/ingest';
+import { generateDedupeKey } from '@/lib/utils/dedupe';
+import { normalizeCompanyName, normalizeEmail } from '@/lib/utils/normalize';
+import { LeadStatus } from '@prisma/client';
+
+// Authentication middleware
+function authenticate(request: NextRequest): boolean {
+  const authHeader = request.headers.get('authorization');
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return false;
+  }
+  
+  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+  const expectedToken = process.env.APP_INGEST_TOKEN;
+  
+  if (!expectedToken) {
+    console.error('APP_INGEST_TOKEN not configured');
+    return false;
+  }
+  
+  return token === expectedToken;
+}
+
+export async function POST(request: NextRequest) {
+  // Authenticate
+  if (!authenticate(request)) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+  
+  try {
+    // Parse and validate request body
+    const body = await request.json();
+    const validationResult = ingestBatchSchema.safeParse(body);
+    
+    if (!validationResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Validation failed',
+          details: validationResult.error.format(),
+        },
+        { status: 400 }
+      );
+    }
+    
+    const { source: sourceInput, leads: leadsInput } = validationResult.data;
+    
+    // Upsert Source
+    const source = await prisma.source.upsert({
+      where: { name: sourceInput.key },
+      update: {},
+      create: {
+        name: sourceInput.key,
+        type: 'scanner', // Default type
+        isActive: true,
+      },
+    });
+    
+    // Process leads
+    const results = {
+      created: 0,
+      updated: 0,
+      skipped: 0,
+      ids: [] as string[],
+    };
+    
+    for (const leadInput of leadsInput) {
+      try {
+        const leadId = await processLead(source.id, leadInput);
+        results.ids.push(leadId);
+      } catch (error) {
+        console.error('Error processing lead:', error);
+        results.skipped++;
+      }
+    }
+    
+    // Calculate created/updated counts
+    // Note: We'll track this in the processLead function
+    results.created = results.ids.length - results.updated;
+    
+    console.log(`Ingestion completed: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped`);
+    
+    return NextResponse.json({
+      success: true,
+      counts: {
+        created: results.created,
+        updated: results.updated,
+        skipped: results.skipped,
+      },
+      ids: results.ids,
+    });
+    
+  } catch (error) {
+    console.error('Ingestion error:', error);
+    
+    return NextResponse.json(
+      {
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
+  }
+}
+
+async function processLead(sourceId: string, leadInput: LeadInput): Promise<string> {
+  // Normalize company name
+  const companyNameNormalized = leadInput.company.name_normalized || 
+    normalizeCompanyName(leadInput.company.name);
+  
+  // Generate dedupe key
+  const dedupeKey = generateDedupeKey({
+    sourceKey: sourceId,
+    companyName: leadInput.company.name,
+    country: leadInput.company.country,
+    contactEmail: leadInput.contact?.email,
+    trigger: leadInput.trigger,
+  });
+  
+  // Upsert Account
+  const account = await prisma.account.upsert({
+    where: {
+      // Use a composite unique constraint if available, or domain
+      // For now, we'll use name_normalized + country as identifier
+      domain: leadInput.company.website ? 
+        new URL(leadInput.company.website).hostname : 
+        `${companyNameNormalized}-${leadInput.company.country || 'unknown'}`,
+    },
+    update: {
+      name: leadInput.company.name,
+      nameNormalized: companyNameNormalized,
+      website: leadInput.company.website,
+      industry: leadInput.company.industry,
+      size: leadInput.company.size,
+      country: leadInput.company.country,
+    },
+    create: {
+      name: leadInput.company.name,
+      nameNormalized: companyNameNormalized,
+      domain: leadInput.company.website ? 
+        new URL(leadInput.company.website).hostname : 
+        `${companyNameNormalized}-${leadInput.company.country || 'unknown'}`,
+      website: leadInput.company.website,
+      industry: leadInput.company.industry,
+      size: leadInput.company.size,
+      country: leadInput.company.country,
+    },
+  });
+  
+  // Upsert Contact if email provided
+  let contactId: string | undefined;
+  if (leadInput.contact?.email) {
+    const normalizedEmail = normalizeEmail(leadInput.contact.email);
+    
+    // Find existing contact by email
+    let contact = await prisma.contact.findFirst({
+      where: { 
+        email: normalizedEmail,
+        accountId: account.id,
+      },
+    });
+    
+    if (contact) {
+      // Update existing contact
+      contact = await prisma.contact.update({
+        where: { id: contact.id },
+        data: {
+          fullName: leadInput.contact.full_name || contact.fullName,
+          phone: leadInput.contact.phone || contact.phone,
+          title: leadInput.contact.role || contact.title,
+        },
+      });
+    } else {
+      // Create new contact
+      contact = await prisma.contact.create({
+        data: {
+          accountId: account.id,
+          email: normalizedEmail,
+          firstName: leadInput.contact.full_name?.split(' ')[0] || '',
+          lastName: leadInput.contact.full_name?.split(' ').slice(1).join(' ') || '',
+          fullName: leadInput.contact.full_name || '',
+          phone: leadInput.contact.phone,
+          title: leadInput.contact.role,
+        },
+      });
+    }
+    
+    contactId = contact.id;
+  }
+  
+  // Check if lead exists
+  const existingLead = await prisma.lead.findUnique({
+    where: { dedupeKey },
+  });
+  
+  const isNew = !existingLead;
+  
+  // Upsert Lead
+  const lead = await prisma.lead.upsert({
+    where: { dedupeKey },
+    update: {
+      score: leadInput.score_final,
+      scoreDetails: {
+        trigger: leadInput.score_trigger,
+        probability: leadInput.score_probability,
+        final: leadInput.score_final,
+        probability_value: leadInput.probability,
+      },
+      rawData: leadInput.raw,
+      enrichedData: {
+        summary: leadInput.summary,
+        trigger: leadInput.trigger,
+        external_id: leadInput.external_id,
+      },
+    },
+    create: {
+      dedupeKey,
+      sourceId,
+      accountId: account.id,
+      title: leadInput.contact?.role,
+      score: leadInput.score_final,
+      scoreDetails: {
+        trigger: leadInput.score_trigger,
+        probability: leadInput.score_probability,
+        final: leadInput.score_final,
+        probability_value: leadInput.probability,
+      },
+      status: LeadStatus.NEW,
+      priority: Math.round(leadInput.score_final / 10), // Convert 0-100 to 0-10
+      rawData: leadInput.raw,
+      enrichedData: {
+        summary: leadInput.summary,
+        trigger: leadInput.trigger,
+        external_id: leadInput.external_id,
+      },
+    },
+  });
+  
+  // Create ScoringRun (always, for historical tracking)
+  await prisma.scoringRun.create({
+    data: {
+      sourceId,
+      leadId: lead.id,
+      score: leadInput.score_final,
+      scoreData: {
+        trigger: leadInput.score_trigger,
+        probability: leadInput.score_probability,
+        final: leadInput.score_final,
+        probability_value: leadInput.probability,
+        summary: leadInput.summary,
+        raw: leadInput.raw,
+      },
+      version: 'v1.0',
+    },
+  });
+  
+  // Create LeadStatusHistory if new lead
+  if (isNew) {
+    // Get a system user or create one
+    let systemUser = await prisma.user.findFirst({
+      where: { email: 'system@gobii.com' },
+    });
+    
+    if (!systemUser) {
+      systemUser = await prisma.user.create({
+        data: {
+          email: 'system@gobii.com',
+          name: 'System',
+          role: 'ADMIN',
+          isActive: true,
+        },
+      });
+    }
+    
+    await prisma.leadStatusHistory.create({
+      data: {
+        leadId: lead.id,
+        fromStatus: null,
+        toStatus: LeadStatus.NEW,
+        reason: 'Lead created via ingestion API',
+        changedById: systemUser.id,
+      },
+    });
+  }
+  
+  return lead.id;
+}

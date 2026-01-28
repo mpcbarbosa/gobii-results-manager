@@ -253,18 +253,131 @@ O sistema utiliza um schema PostgreSQL production-grade com as seguintes entidad
 
 Para mais detalhes, consulte [`prisma/schema.prisma`](prisma/schema.prisma).
 
+## API Endpoints (Milestone 2)
+
+### Health Check
+
+Verifica a conectividade com a base de dados:
+
+```bash
+curl http://localhost:3000/api/health
+```
+
+**Resposta:**
+```json
+{
+  "ok": true,
+  "timestamp": "2026-01-28T14:00:00.000Z",
+  "database": "connected"
+}
+```
+
+### Ingestion API
+
+Endpoint para ingestão de leads dos agentes Gobii (idempotente).
+
+**Autenticação:** Bearer token via header `Authorization`
+
+**Endpoint:** `POST /api/ingest/leads`
+
+**Headers:**
+```
+Authorization: Bearer YOUR_APP_INGEST_TOKEN
+Content-Type: application/json
+```
+
+**Payload:**
+```json
+{
+  "source": {
+    "key": "SAPS4HANALeadScannerDaily"
+  },
+  "leads": [
+    {
+      "external_id": "optional-external-id",
+      "company": {
+        "name": "Empresa Exemplo Lda",
+        "country": "PT",
+        "industry": "Manufacturing",
+        "size": "50-200",
+        "website": "https://exemplo.pt",
+        "tax_id": "123456789"
+      },
+      "contact": {
+        "full_name": "João Silva",
+        "email": "joao.silva@exemplo.pt",
+        "phone": "+351912345678",
+        "role": "CTO"
+      },
+      "trigger": "Implementação SAP S/4HANA em curso",
+      "probability": 0.85,
+      "score_trigger": 70,
+      "score_probability": 17,
+      "score_final": 87,
+      "summary": "Empresa em processo de migração para SAP S/4HANA",
+      "raw": {
+        "source_url": "https://...",
+        "detected_at": "2026-01-28T10:00:00Z"
+      }
+    }
+  ]
+}
+```
+
+**Exemplo cURL:**
+```bash
+curl -X POST http://localhost:3000/api/ingest/leads \
+  -H "Authorization: Bearer your-secure-token-here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "source": {"key": "TestScanner"},
+    "leads": [{
+      "company": {
+        "name": "Test Company",
+        "country": "PT"
+      },
+      "trigger": "Test trigger",
+      "probability": 0.8,
+      "score_trigger": 60,
+      "score_probability": 16,
+      "score_final": 76
+    }]
+  }'
+```
+
+**Resposta de Sucesso:**
+```json
+{
+  "success": true,
+  "counts": {
+    "created": 1,
+    "updated": 0,
+    "skipped": 0
+  },
+  "ids": ["uuid-1", "uuid-2"]
+}
+```
+
+**Características:**
+- ✅ **Idempotente**: Mesmo lead não é duplicado (usa `dedupe_key`)
+- ✅ **Batch processing**: Processa múltiplos leads numa única chamada
+- ✅ **Upsert automático**: Cria ou atualiza Account, Contact, Lead
+- ✅ **Histórico completo**: Cria ScoringRun e LeadStatusHistory
+- ✅ **Validação robusta**: Zod schemas para validação de payload
+
 ## Próximos Passos
 
 Este projeto completou:
 - ✅ **Milestone 0**: Foundation (Next.js, Prisma, Tailwind, shadcn/ui)
 - ✅ **Milestone 1**: Core Database Schema (modelo de dados completo)
+- ✅ **Milestone 2**: Ingestion API (endpoint idempotente para leads)
 
 Os próximos milestones incluirão:
 
-1. **Milestone 2**: Sistema de autenticação e autorização
-2. **Milestone 3**: APIs REST para gestão de leads
-3. **Milestone 4**: Interface de utilizador (dashboards, listas, formulários)
-4. **Milestone 5**: Analytics e Reporting
+1. **Milestone 3**: Sistema de autenticação e autorização (NextAuth.js)
+2. **Milestone 4**: APIs REST para gestão de leads (CRUD completo)
+3. **Milestone 5**: Interface de utilizador (dashboards, listas, formulários)
+4. **Milestone 6**: Analytics e Reporting
 
 ## Suporte
 
