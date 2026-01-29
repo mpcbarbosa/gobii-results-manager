@@ -639,6 +639,70 @@ $response | ConvertTo-Json -Depth 10
 
 Endpoints administrativos para manutenção do sistema (requer `APP_ADMIN_TOKEN`).
 
+#### GET /api/admin/accounts
+
+Lista contas do sistema com paginação e pesquisa. Útil para obter `accountId` para testes ou operações administrativas.
+
+**Autenticação:** Bearer token via header `Authorization`
+
+**Headers:**
+```
+Authorization: Bearer YOUR_APP_ADMIN_TOKEN
+```
+
+**Query Parameters:**
+
+| Parâmetro | Tipo | Default | Descrição |
+|-----------|------|---------|-----------|
+| `take` | number | 20 | Número de itens (max 100) |
+| `skip` | number | 0 | Número de itens a saltar |
+| `q` | string | - | Pesquisa em name ou domain (case-insensitive) |
+
+**Exemplo cURL:**
+```bash
+curl -X GET "http://localhost:3000/api/admin/accounts?take=10&q=exemplo" \
+  -H "Authorization: Bearer your-admin-token"
+```
+
+**Exemplo PowerShell:**
+```powershell
+$headers = @{
+    "Authorization" = "Bearer your-admin-token"
+}
+$response = Invoke-RestMethod -Uri "http://localhost:3000/api/admin/accounts?take=10&q=exemplo" -Headers $headers
+$response.items | Format-Table id, name, domain, updatedAt
+```
+
+**Resposta:**
+```json
+{
+  "success": true,
+  "take": 10,
+  "skip": 0,
+  "count": 42,
+  "items": [
+    {
+      "id": "123e4567-e89b-12d3-a456-426614174000",
+      "name": "Empresa Exemplo Lda",
+      "domain": "exemplo.pt",
+      "updatedAt": "2026-01-29T10:00:00.000Z"
+    },
+    {
+      "id": "123e4567-e89b-12d3-a456-426614174001",
+      "name": "Another Company",
+      "domain": null,
+      "updatedAt": "2026-01-28T15:30:00.000Z"
+    }
+  ]
+}
+```
+
+**Características:**
+- ✅ **Paginação**: Suporta até 100 itens por página
+- ✅ **Pesquisa**: Busca case-insensitive em name e domain
+- ✅ **Ordenação**: Por updatedAt desc (mais recentes primeiro)
+- ✅ **Contagem total**: Retorna count para paginação
+
 #### POST /api/admin/accounts/backfill-domain
 
 Atualiza o campo `domain` de múltiplas contas em batch. Útil para corrigir dados históricos ou migração de dados.
