@@ -635,6 +635,129 @@ $response | ConvertTo-Json -Depth 10
 - ✅ **Soft delete aware**: Exclui automaticamente registos apagados
 - ✅ **Detalhe completo**: Endpoint dedicado com histórico completo
 
+### Admin API
+
+Endpoints administrativos para manutenção do sistema (requer `APP_ADMIN_TOKEN`).
+
+#### POST /api/admin/accounts/backfill-domain
+
+Atualiza o campo `domain` de múltiplas contas em batch. Útil para corrigir dados históricos ou migração de dados.
+
+**Autenticação:** Bearer token via header `Authorization`
+
+**Headers:**
+```
+Authorization: Bearer YOUR_APP_ADMIN_TOKEN
+Content-Type: application/json
+```
+
+**Payload:**
+```json
+{
+  "updates": [
+    {
+      "accountId": "uuid-da-conta-1",
+      "domain": "exemplo.pt"
+    },
+    {
+      "accountId": "uuid-da-conta-2",
+      "domain": null
+    }
+  ]
+}
+```
+
+**Validações:**
+- `domain` deve ser string ou `null`
+- `domain` não pode conter espaços (rejeitado)
+- `domain` é normalizado: lowercase + trim
+- Strings vazias após trim são convertidas para `null`
+
+**Exemplo cURL:**
+```bash
+curl -X POST http://localhost:3000/api/admin/accounts/backfill-domain \
+  -H "Authorization: Bearer your-admin-token" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "updates": [
+      {"accountId": "123e4567-e89b-12d3-a456-426614174000", "domain": "example.com"},
+      {"accountId": "123e4567-e89b-12d3-a456-426614174001", "domain": null}
+    ]
+  }'
+```
+
+**Exemplo PowerShell:**
+```powershell
+$headers = @{
+    "Authorization" = "Bearer your-admin-token"
+    "Content-Type" = "application/json"
+}
+$body = @{
+    updates = @(
+        @{ accountId = "123e4567-e89b-12d3-a456-426614174000"; domain = "example.com" },
+        @{ accountId = "123e4567-e89b-12d3-a456-426614174001"; domain = $null }
+    )
+} | ConvertTo-Json -Depth 3
+
+$response = Invoke-RestMethod -Uri "http://localhost:3000/api/admin/accounts/backfill-domain" `
+    -Method Post -Headers $headers -Body $body
+$response | ConvertTo-Json
+```
+
+**Resposta de Sucesso:**
+```json
+{
+  "success": true,
+  "updatedCount": 2,
+  "updated": [
+    {
+      "accountId": "uuid-1",
+      "oldDomain": "fallback-empresa-exemplo-pt",
+      "newDomain": "exemplo.pt"
+    },
+    {
+      "accountId": "uuid-2",
+      "oldDomain": "example.com",
+      "newDomain": null
+    }
+  ],
+  "skipped": []
+}
+```
+
+**Resposta com Erros:**
+```json
+{
+  "success": true,
+  "updatedCount": 1,
+  "updated": [
+    {
+      "accountId": "uuid-1",
+      "oldDomain": null,
+      "newDomain": "exemplo.pt"
+    }
+  ],
+  "skipped": [
+    {
+      "accountId": "uuid-2",
+      "reason": "Domain cannot contain spaces"
+    },
+    {
+      "accountId": "uuid-3",
+      "reason": "Account not found"
+    }
+  ]
+}
+```
+
+**Características:**
+- ✅ **Batch processing**: Atualiza múltiplas contas numa única chamada
+- ✅ **Validação rigorosa**: Rejeita domains com espaços
+- ✅ **Normalização automática**: Lowercase + trim
+- ✅ **Relatório detalhado**: Lista sucessos e falhas
+- ✅ **Idempotente**: Pode ser executado múltiplas vezes
+- ✅ **Audit trail**: Retorna valores antigos e novos
+
 ## Próximos Passos
 
 Este projeto completou:
