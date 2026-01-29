@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { generateDomainSuggestion, meetsConfidenceThreshold } from '@/lib/utils/domain-suggestion';
+import { generateDomainSuggestion, meetsConfidenceThreshold, isInvalidDomain } from '@/lib/utils/domain-suggestion';
 
 // Authentication middleware
 function authenticate(request: NextRequest): boolean {
@@ -56,6 +56,8 @@ export async function POST(request: NextRequest) {
     
     const accountIds: string[] = body.accountIds;
     const minConfidence = (body.minConfidence || 'high') as 'low' | 'medium' | 'high';
+    const overwriteInvalid = body.overwriteInvalid !== undefined ? body.overwriteInvalid : true;
+    const overwriteValid = body.overwriteValid !== undefined ? body.overwriteValid : false;
     
     // Validate max 200 accounts
     if (accountIds.length > 200) {
@@ -96,6 +98,26 @@ export async function POST(request: NextRequest) {
           skipped.push({
             accountId,
             reason: `Confidence ${suggestion.confidence} below threshold ${minConfidence}`,
+          });
+          continue;
+        }
+        
+        // Check overwrite rules
+        const currentDomainIsInvalid = isInvalidDomain(suggestion.currentDomain);
+        const currentDomainIsValid = suggestion.currentDomain !== null && !currentDomainIsInvalid;
+        
+        if (currentDomainIsInvalid && !overwriteInvalid) {
+          skipped.push({
+            accountId,
+            reason: 'Current domain is invalid but overwriteInvalid=false',
+          });
+          continue;
+        }
+        
+        if (currentDomainIsValid && !overwriteValid) {
+          skipped.push({
+            accountId,
+            reason: 'Current domain is valid but overwriteValid=false',
           });
           continue;
         }

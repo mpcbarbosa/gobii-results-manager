@@ -2,6 +2,7 @@ import prisma from '@/lib/prisma';
 
 export type Confidence = 'high' | 'medium' | 'low' | null;
 export type Source = 'website' | 'email' | null;
+export type Mode = 'missing' | 'all' | 'invalid' | 'missing_or_invalid';
 
 export interface DomainSuggestion {
   accountId: string;
@@ -26,6 +27,33 @@ const PERSONAL_EMAIL_PROVIDERS = [
   'protonmail.com',
   'live.com',
 ];
+
+/**
+ * Check if a domain is invalid
+ */
+export function isInvalidDomain(domain: string | null): boolean {
+  if (!domain) return false; // null is not invalid, it's missing
+  
+  // Contains whitespace
+  if (/\s/.test(domain)) return true;
+  
+  // Does not contain a dot
+  if (!domain.includes('.')) return true;
+  
+  // Starts with "http" or contains "/" (looks like URL)
+  if (domain.startsWith('http') || domain.includes('/')) return true;
+  
+  // Contains "@" (looks like email)
+  if (domain.includes('@')) return true;
+  
+  // Length < 3
+  if (domain.length < 3) return true;
+  
+  // Contains characters outside [a-z0-9.-]
+  if (!/^[a-z0-9.-]+$/i.test(domain)) return true;
+  
+  return false;
+}
 
 /**
  * Extract and normalize domain from a URL

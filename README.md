@@ -839,8 +839,22 @@ Authorization: Bearer YOUR_APP_ADMIN_TOKEN
 |-----------|------|---------|-----------|
 | `take` | number | 50 | Número de itens (max 200) |
 | `skip` | number | 0 | Número de itens a saltar |
-| `mode` | string | missing | `missing` (só sem domain) ou `all` |
+| `mode` | string | missing | `missing`, `all`, `invalid`, `missing_or_invalid` |
 | `minConfidence` | string | medium | `low`, `medium` ou `high` |
+
+**Modos:**
+- `missing`: Apenas contas com `domain = null`
+- `all`: Todas as contas
+- `invalid`: Apenas contas com domain inválido (não-null mas inválido)
+- `missing_or_invalid`: Contas com domain null OU inválido
+
+**Regras de Domain Inválido:**
+- Contém espaços
+- Não contém ponto (.)
+- Começa com "http" ou contém "/" (parece URL)
+- Contém "@" (parece email)
+- Comprimento < 3
+- Contém caracteres fora de [a-z0-9.-]
 
 **Heurísticas de Sugestão:**
 1. **Website**: Extrai hostname do campo `website`, normaliza e valida
@@ -850,13 +864,20 @@ Authorization: Bearer YOUR_APP_ADMIN_TOKEN
    - `medium`: 1 email corporativo
    - `low`: outras situações
 
-**Exemplo PowerShell (dry-run):**
+**Exemplo PowerShell (dry-run - domains em falta):**
 ```powershell
 $headers = @{
     "Authorization" = "Bearer your-admin-token"
 }
 $response = Invoke-RestMethod -Uri "http://localhost:3000/api/admin/accounts/suggest-domains?mode=missing&minConfidence=medium" -Headers $headers
 $response.items | Format-Table accountId, name, currentDomain, suggestedDomain, confidence, source
+```
+
+**Exemplo PowerShell (dry-run - domains inválidos):**
+```powershell
+# Encontrar e corrigir domains inválidos (ex: "http://example.com", "user@example.com", "example com")
+$response = Invoke-RestMethod -Uri "http://localhost:3000/api/admin/accounts/suggest-domains?mode=invalid&minConfidence=high" -Headers $headers
+$response.items | Where-Object { $_.suggestedDomain } | Format-Table accountId, currentDomain, suggestedDomain, confidence
 ```
 
 **Resposta:**
@@ -911,14 +932,23 @@ Content-Type: application/json
 ```json
 {
   "accountIds": ["uuid-1", "uuid-2"],
-  "minConfidence": "high"
+  "minConfidence": "high",
+  "overwriteInvalid": true,
+  "overwriteValid": false
 }
 ```
 
-**Validações:**
-- Máximo 200 `accountIds` por chamada
+**Parâmetros:**
+- `accountIds`: Array de UUIDs (máximo 200)
 - `minConfidence`: `medium` ou `high` (default: `high`)
+- `overwriteInvalid`: Sobrescrever domains inválidos (default: `true`)
+- `overwriteValid`: Sobrescrever domains válidos (default: `false`)
+
+**Validações e Segurança:**
+- Máximo 200 `accountIds` por chamada
 - Sugestões são recomputadas server-side (não confia no cliente)
+- **Proteção de domains válidos**: Por default, NÃO sobrescreve domains válidos
+- **Correção automática**: Por default, sobrescreve domains inválidos
 
 **Exemplo PowerShell (aplicar sugestões):**
 ```powershell
