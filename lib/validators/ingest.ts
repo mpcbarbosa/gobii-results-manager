@@ -8,6 +8,7 @@ export const sourceSchema = z.object({
 // Company schema
 export const companySchema = z.object({
   name: z.string().min(1, 'Company name is required'),
+  domain: z.string().optional(),
   country: z.string().optional(),
   industry: z.string().optional(),
   size: z.string().optional(),
@@ -18,6 +19,7 @@ export const companySchema = z.object({
 
 // Contact schema
 export const contactSchema = z.object({
+  name: z.string().optional(),
   full_name: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
   phone: z.string().optional(),

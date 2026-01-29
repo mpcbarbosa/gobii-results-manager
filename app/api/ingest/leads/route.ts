@@ -113,6 +113,10 @@ async function processLead(sourceId: string, leadInput: LeadInput): Promise<stri
   const companyNameNormalized = leadInput.company.name_normalized || 
     normalizeCompanyName(leadInput.company.name);
   
+  // Normalize domain if provided
+  const normalizedDomain = leadInput.company.domain ? 
+    leadInput.company.domain.toLowerCase().trim() : null;
+  
   // Generate dedupe key
   const dedupeKey = generateDedupeKey({
     sourceKey: sourceId,
@@ -122,18 +126,17 @@ async function processLead(sourceId: string, leadInput: LeadInput): Promise<stri
     trigger: leadInput.trigger,
   });
   
-  // Upsert Account
+  // Upsert Account - use domain or fallback to name_normalized for unique constraint
+  const accountLookupKey = normalizedDomain || `fallback-${companyNameNormalized}-${leadInput.company.country || 'unknown'}`;
+  
   const account = await prisma.account.upsert({
     where: {
-      // Use a composite unique constraint if available, or domain
-      // For now, we'll use name_normalized + country as identifier
-      domain: leadInput.company.website ? 
-        new URL(leadInput.company.website).hostname : 
-        `${companyNameNormalized}-${leadInput.company.country || 'unknown'}`,
+      domain: accountLookupKey,
     },
     update: {
       name: leadInput.company.name,
       nameNormalized: companyNameNormalized,
+      domain: normalizedDomain,
       website: leadInput.company.website,
       industry: leadInput.company.industry,
       size: leadInput.company.size,
@@ -142,9 +145,7 @@ async function processLead(sourceId: string, leadInput: LeadInput): Promise<stri
     create: {
       name: leadInput.company.name,
       nameNormalized: companyNameNormalized,
-      domain: leadInput.company.website ? 
-        new URL(leadInput.company.website).hostname : 
-        `${companyNameNormalized}-${leadInput.company.country || 'unknown'}`,
+      domain: normalizedDomain,
       website: leadInput.company.website,
       industry: leadInput.company.industry,
       size: leadInput.company.size,
@@ -156,6 +157,9 @@ async function processLead(sourceId: string, leadInput: LeadInput): Promise<stri
   let _contactId: string | undefined; // Reserved for future use
   if (leadInput.contact?.email) {
     const normalizedEmail = normalizeEmail(leadInput.contact.email);
+    
+    // Determine fullName from name or full_name
+    const fullName = leadInput.contact.name || leadInput.contact.full_name || '';
     
     // Find existing contact by email
     let contact = await prisma.contact.findFirst({
@@ -170,22 +174,43 @@ async function processLead(sourceId: string, leadInput: LeadInput): Promise<stri
       contact = await prisma.contact.update({
         where: { id: contact.id },
         data: {
-          fullName: leadInput.contact.full_name || contact.fullName,
+          fullName: fullName || contact.fullName,
           phone: leadInput.contact.phone || contact.phone,
           title: leadInput.contact.role || contact.title,
         },
       });
     } else {
+      // Check if this is the first contact for this account
+      const existingContactsCount = await prisma.contact.count({
+        where: {
+          accountId: account.id,
+          deletedAt: null,
+        },
+      });
+      
+      // Check if there's already a primary contact
+      const hasPrimaryContact = await prisma.contact.findFirst({
+        where: {
+          accountId: account.id,
+          isPrimary: true,
+          deletedAt: null,
+        },
+      });
+      
+      // Set isPrimary=true if this is the first contact or no primary exists
+      const isPrimary = existingContactsCount === 0 || !hasPrimaryContact;
+      
       // Create new contact
       contact = await prisma.contact.create({
         data: {
           accountId: account.id,
           email: normalizedEmail,
-          firstName: leadInput.contact.full_name?.split(' ')[0] || '',
-          lastName: leadInput.contact.full_name?.split(' ').slice(1).join(' ') || '',
-          fullName: leadInput.contact.full_name || '',
+          firstName: fullName.split(' ')[0] || '',
+          lastName: fullName.split(' ').slice(1).join(' ') || '',
+          fullName: fullName,
           phone: leadInput.contact.phone,
           title: leadInput.contact.role,
+          isPrimary,
         },
       });
     }

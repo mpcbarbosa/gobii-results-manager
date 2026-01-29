@@ -150,6 +150,36 @@ export async function GET(request: NextRequest) {
       primaryContacts.map(c => [c.accountId, c])
     );
     
+    // For accounts without a primary contact, get the first contact as fallback
+    const accountsWithoutPrimary = accountIds.filter(id => !contactsByAccount.has(id));
+    if (accountsWithoutPrimary.length > 0) {
+      const fallbackContacts = await prisma.contact.findMany({
+        where: {
+          accountId: { in: accountsWithoutPrimary },
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          accountId: true,
+          fullName: true,
+          email: true,
+          phone: true,
+          title: true,
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+        distinct: ['accountId'],
+      });
+      
+      // Add fallback contacts to the map
+      fallbackContacts.forEach(c => {
+        if (!contactsByAccount.has(c.accountId)) {
+          contactsByAccount.set(c.accountId, c);
+        }
+      });
+    }
+    
     // Format response
     const items = leads.map(lead => {
       const assignment = lead.assignments[0];
