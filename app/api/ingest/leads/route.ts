@@ -71,17 +71,18 @@ export async function POST(request: NextRequest) {
     
     for (const leadInput of leadsInput) {
       try {
-        const leadId = await processLead(source.id, leadInput);
-        results.ids.push(leadId);
+        const result = await processLead(source.id, leadInput);
+        results.ids.push(result.leadId);
+        if (result.isNew) {
+          results.created++;
+        } else {
+          results.updated++;
+        }
       } catch (error) {
         console.error('Error processing lead:', error);
         results.skipped++;
       }
     }
-    
-    // Calculate created/updated counts
-    // Note: We'll track this in the processLead function
-    results.created = results.ids.length - results.updated;
     
     console.log(`Ingestion completed: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped`);
     
@@ -108,7 +109,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function processLead(sourceId: string, leadInput: LeadInput): Promise<string> {
+async function processLead(sourceId: string, leadInput: LeadInput): Promise<{ leadId: string; isNew: boolean }> {
   // Normalize company name
   const companyNameNormalized = leadInput.company.name_normalized || 
     normalizeCompanyName(leadInput.company.name);
@@ -313,5 +314,5 @@ async function processLead(sourceId: string, leadInput: LeadInput): Promise<stri
     });
   }
   
-  return lead.id;
+  return { leadId: lead.id, isNew };
 }
