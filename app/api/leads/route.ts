@@ -160,32 +160,33 @@ export async function GET(request: NextRequest) {
       
       // Extract probability from scoreDetails or enrichedData
       let probability: number | undefined;
-      if (lead.scoreDetails && typeof lead.scoreDetails === 'object') {
-        const details = lead.scoreDetails as any;
-        probability = details.probability_value || details.probability;
+      if (lead.scoreDetails && typeof lead.scoreDetails === 'object' && lead.scoreDetails !== null) {
+        const details = lead.scoreDetails as Record<string, unknown>;
+        probability = (typeof details.probability_value === 'number' ? details.probability_value : undefined) || 
+                      (typeof details.probability === 'number' ? details.probability : undefined);
       }
       
       // Extract trigger from enrichedData
       let trigger: string | undefined;
-      if (lead.enrichedData && typeof lead.enrichedData === 'object') {
-        const enriched = lead.enrichedData as any;
-        trigger = enriched.trigger;
+      if (lead.enrichedData && typeof lead.enrichedData === 'object' && lead.enrichedData !== null) {
+        const enriched = lead.enrichedData as Record<string, unknown>;
+        trigger = typeof enriched.trigger === 'string' ? enriched.trigger : undefined;
       }
       
       // Extract summary from enrichedData
       let summary: string | undefined;
-      if (lead.enrichedData && typeof lead.enrichedData === 'object') {
-        const enriched = lead.enrichedData as any;
-        summary = enriched.summary;
+      if (lead.enrichedData && typeof lead.enrichedData === 'object' && lead.enrichedData !== null) {
+        const enriched = lead.enrichedData as Record<string, unknown>;
+        summary = typeof enriched.summary === 'string' ? enriched.summary : undefined;
       }
       
       // Extract score components from scoreDetails
       let scoreTrigger: number | undefined;
       let scoreProbability: number | undefined;
-      if (lead.scoreDetails && typeof lead.scoreDetails === 'object') {
-        const details = lead.scoreDetails as any;
-        scoreTrigger = details.trigger;
-        scoreProbability = details.probability;
+      if (lead.scoreDetails && typeof lead.scoreDetails === 'object' && lead.scoreDetails !== null) {
+        const details = lead.scoreDetails as Record<string, unknown>;
+        scoreTrigger = typeof details.trigger === 'number' ? details.trigger : undefined;
+        scoreProbability = typeof details.probability === 'number' ? details.probability : undefined;
       }
       
       return {

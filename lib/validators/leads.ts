@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LeadStatus } from '@prisma/client';
+import { LeadStatus, HandoffStatus, Prisma } from '@prisma/client';
 
 // Valid sort fields
 const sortFields = ['created_at', 'updated_at', 'score', 'probability'] as const;
@@ -50,8 +50,8 @@ export function parseStatusFilter(status?: string): LeadStatus[] | undefined {
 /**
  * Build Prisma where clause from query params
  */
-export function buildLeadsWhereClause(params: LeadsQueryParams) {
-  const where: any = {
+export function buildLeadsWhereClause(params: LeadsQueryParams): Prisma.LeadWhereInput {
+  const where: Prisma.LeadWhereInput = {
     deletedAt: null, // Exclude soft deleted
   };
   
@@ -121,11 +121,15 @@ export function buildLeadsWhereClause(params: LeadsQueryParams) {
   
   // Handoff status filter
   if (params.handoffStatus) {
-    where.handoffs = {
-      some: {
-        status: params.handoffStatus,
-      },
-    };
+    // Validate that the status is a valid HandoffStatus enum value
+    const validHandoffStatus = Object.values(HandoffStatus).includes(params.handoffStatus as HandoffStatus);
+    if (validHandoffStatus) {
+      where.handoffs = {
+        some: {
+          status: params.handoffStatus as HandoffStatus,
+        },
+      };
+    }
   }
   
   // Date range filter
@@ -146,7 +150,7 @@ export function buildLeadsWhereClause(params: LeadsQueryParams) {
  * Build Prisma orderBy clause from query params
  */
 export function buildLeadsOrderBy(params: LeadsQueryParams) {
-  const orderBy: any = {};
+  const orderBy: Record<string, 'asc' | 'desc'> = {};
   
   switch (params.sort) {
     case 'created_at':

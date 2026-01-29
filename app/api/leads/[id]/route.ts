@@ -4,7 +4,7 @@ import { requireBearerToken, unauthorizedResponse } from '@/lib/auth/token';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   // Authenticate
   if (!requireBearerToken(request, 'APP_READ_TOKEN')) {
@@ -12,7 +12,7 @@ export async function GET(
   }
   
   try {
-    const { id } = params;
+    const { id } = await params;
     
     // Fetch lead with all related data
     const lead = await prisma.lead.findUnique({
@@ -174,21 +174,22 @@ export async function GET(
     let probability: number | undefined;
     let scoreTrigger: number | undefined;
     let scoreProbability: number | undefined;
-    if (lead.scoreDetails && typeof lead.scoreDetails === 'object') {
-      const details = lead.scoreDetails as any;
-      probability = details.probability_value || details.probability;
-      scoreTrigger = details.trigger;
-      scoreProbability = details.probability;
+    if (lead.scoreDetails && typeof lead.scoreDetails === 'object' && lead.scoreDetails !== null) {
+      const details = lead.scoreDetails as Record<string, unknown>;
+      probability = (typeof details.probability_value === 'number' ? details.probability_value : undefined) || 
+                    (typeof details.probability === 'number' ? details.probability : undefined);
+      scoreTrigger = typeof details.trigger === 'number' ? details.trigger : undefined;
+      scoreProbability = typeof details.probability === 'number' ? details.probability : undefined;
     }
     
     let trigger: string | undefined;
     let summary: string | undefined;
     let externalId: string | undefined;
-    if (lead.enrichedData && typeof lead.enrichedData === 'object') {
-      const enriched = lead.enrichedData as any;
-      trigger = enriched.trigger;
-      summary = enriched.summary;
-      externalId = enriched.external_id;
+    if (lead.enrichedData && typeof lead.enrichedData === 'object' && lead.enrichedData !== null) {
+      const enriched = lead.enrichedData as Record<string, unknown>;
+      trigger = typeof enriched.trigger === 'string' ? enriched.trigger : undefined;
+      summary = typeof enriched.summary === 'string' ? enriched.summary : undefined;
+      externalId = typeof enriched.external_id === 'string' ? enriched.external_id : undefined;
     }
     
     // Format response
