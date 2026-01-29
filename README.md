@@ -822,6 +822,166 @@ $response | ConvertTo-Json
 - ✅ **Idempotente**: Pode ser executado múltiplas vezes
 - ✅ **Audit trail**: Retorna valores antigos e novos
 
+#### GET /api/admin/accounts/suggest-domains
+
+Gera sugestões de domínios para contas (dry-run). Não altera a base de dados.
+
+**Autenticação:** Bearer token via header `Authorization`
+
+**Headers:**
+```
+Authorization: Bearer YOUR_APP_ADMIN_TOKEN
+```
+
+**Query Parameters:**
+
+| Parâmetro | Tipo | Default | Descrição |
+|-----------|------|---------|-----------|
+| `take` | number | 50 | Número de itens (max 200) |
+| `skip` | number | 0 | Número de itens a saltar |
+| `mode` | string | missing | `missing` (só sem domain) ou `all` |
+| `minConfidence` | string | medium | `low`, `medium` ou `high` |
+
+**Heurísticas de Sugestão:**
+1. **Website**: Extrai hostname do campo `website`, normaliza e valida
+2. **Email**: Analisa emails dos contactos, ignora providers pessoais (gmail, outlook, etc.)
+3. **Confidence**:
+   - `high`: ≥2 emails matching ou domain match com nome da empresa
+   - `medium`: 1 email corporativo
+   - `low`: outras situações
+
+**Exemplo PowerShell (dry-run):**
+```powershell
+$headers = @{
+    "Authorization" = "Bearer your-admin-token"
+}
+$response = Invoke-RestMethod -Uri "http://localhost:3000/api/admin/accounts/suggest-domains?mode=missing&minConfidence=medium" -Headers $headers
+$response.items | Format-Table accountId, name, currentDomain, suggestedDomain, confidence, source
+```
+
+**Resposta:**
+```json
+{
+  "success": true,
+  "take": 50,
+  "skip": 0,
+  "count": 120,
+  "items": [
+    {
+      "accountId": "uuid-1",
+      "name": "Empresa Exemplo Lda",
+      "currentDomain": null,
+      "suggestedDomain": "exemplo.pt",
+      "confidence": "high",
+      "source": "website",
+      "evidence": {
+        "website": "https://www.exemplo.pt",
+        "emailsUsed": []
+      }
+    },
+    {
+      "accountId": "uuid-2",
+      "name": "Another Company",
+      "currentDomain": null,
+      "suggestedDomain": "company.com",
+      "confidence": "high",
+      "source": "email",
+      "evidence": {
+        "website": null,
+        "emailsUsed": ["john@company.com", "jane@company.com"]
+      }
+    }
+  ]
+}
+```
+
+#### POST /api/admin/accounts/apply-suggested-domains
+
+Aplica sugestões de domínios geradas server-side. Recomputa sugestões para garantir segurança.
+
+**Autenticação:** Bearer token via header `Authorization`
+
+**Headers:**
+```
+Authorization: Bearer YOUR_APP_ADMIN_TOKEN
+Content-Type: application/json
+```
+
+**Payload:**
+```json
+{
+  "accountIds": ["uuid-1", "uuid-2"],
+  "minConfidence": "high"
+}
+```
+
+**Validações:**
+- Máximo 200 `accountIds` por chamada
+- `minConfidence`: `medium` ou `high` (default: `high`)
+- Sugestões são recomputadas server-side (não confia no cliente)
+
+**Exemplo PowerShell (aplicar sugestões):**
+```powershell
+$headers = @{
+    "Authorization" = "Bearer your-admin-token"
+    "Content-Type" = "application/json"
+}
+
+# Primeiro, obter sugestões (dry-run)
+$suggestions = Invoke-RestMethod -Uri "http://localhost:3000/api/admin/accounts/suggest-domains?mode=missing&minConfidence=high" -Headers $headers
+
+# Extrair accountIds com high confidence
+$accountIds = $suggestions.items | Where-Object { $_.confidence -eq "high" } | Select-Object -ExpandProperty accountId
+
+# Aplicar sugestões
+$body = @{
+    accountIds = $accountIds
+    minConfidence = "high"
+} | ConvertTo-Json
+
+$result = Invoke-RestMethod -Uri "http://localhost:3000/api/admin/accounts/apply-suggested-domains" `
+    -Method Post -Headers $headers -Body $body
+$result | ConvertTo-Json
+```
+
+**Resposta:**
+```json
+{
+  "success": true,
+  "updatedCount": 2,
+  "updated": [
+    {
+      "accountId": "uuid-1",
+      "oldDomain": null,
+      "newDomain": "exemplo.pt",
+      "confidence": "high",
+      "source": "website"
+    },
+    {
+      "accountId": "uuid-2",
+      "oldDomain": null,
+      "newDomain": "company.com",
+      "confidence": "high",
+      "source": "email"
+    }
+  ],
+  "skipped": [
+    {
+      "accountId": "uuid-3",
+      "reason": "Confidence medium below threshold high"
+    }
+  ]
+}
+```
+
+**Características:**
+- ✅ **Production-grade**: Recomputa sugestões server-side
+- ✅ **Batch-safe**: Até 200 contas por chamada
+- ✅ **Confidence filtering**: Só aplica se confidence >= threshold
+- ✅ **Heurísticas inteligentes**: Website > Email corporativo
+- ✅ **Ignora providers pessoais**: gmail, outlook, hotmail, etc.
+- ✅ **Relatório detalhado**: Updated + skipped com razões
+
 ## Próximos Passos
 
 Este projeto completou:
