@@ -278,6 +278,10 @@ Endpoint para ingestão de leads dos agentes Gobii (idempotente).
 
 **Autenticação:** Bearer token via header `Authorization`
 
+**Tokens aceites:**
+- `APP_INGEST_TOKEN` (primário para scanners/agentes)
+- `APP_ADMIN_TOKEN` (override para testes manuais)
+
 **Endpoint:** `POST /api/ingest/leads`
 
 **Headers:**
@@ -285,6 +289,11 @@ Endpoint para ingestão de leads dos agentes Gobii (idempotente).
 Authorization: Bearer YOUR_APP_INGEST_TOKEN
 Content-Type: application/json
 ```
+
+**Segurança:**
+- Se `APP_INGEST_TOKEN` não estiver configurado, retorna 500 (não permite ingestão não autenticada)
+- Token é trimmed antes da comparação
+- Comparação segura de tokens
 
 **Payload:**
 ```json

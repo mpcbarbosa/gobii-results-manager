@@ -7,30 +7,39 @@ import { generateDomainSuggestionFromLeadData, isInvalidDomain } from '@/lib/uti
 import { LeadStatus } from '@prisma/client';
 
 // Authentication middleware
-function authenticate(request: NextRequest): boolean {
+function authenticate(request: NextRequest): { success: boolean; error?: string; status?: number } {
   const authHeader = request.headers.get('authorization');
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return false;
+    return { success: false, error: 'Unauthorized', status: 401 };
   }
   
-  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-  const expectedToken = process.env.APP_INGEST_TOKEN;
+  const token = authHeader.substring(7).trim(); // Remove 'Bearer ' prefix and trim
   
-  if (!expectedToken) {
+  // Check if APP_INGEST_TOKEN is configured
+  const ingestToken = process.env.APP_INGEST_TOKEN;
+  if (!ingestToken) {
     console.error('APP_INGEST_TOKEN not configured');
-    return false;
+    return { success: false, error: 'APP_INGEST_TOKEN not configured', status: 500 };
   }
   
-  return token === expectedToken;
+  // Accept either APP_INGEST_TOKEN or APP_ADMIN_TOKEN
+  const adminToken = process.env.APP_ADMIN_TOKEN;
+  
+  if (token === ingestToken || (adminToken && token === adminToken)) {
+    return { success: true };
+  }
+  
+  return { success: false, error: 'Unauthorized', status: 401 };
 }
 
 export async function POST(request: NextRequest) {
   // Authenticate
-  if (!authenticate(request)) {
+  const authResult = authenticate(request);
+  if (!authResult.success) {
     return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
+      { error: authResult.error },
+      { status: authResult.status || 401 }
     );
   }
   
