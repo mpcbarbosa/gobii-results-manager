@@ -218,3 +218,45 @@ export function meetsConfidenceThreshold(
   const levels = { low: 1, medium: 2, high: 3 };
   return levels[confidence] >= levels[minConfidence];
 }
+
+/**
+ * Generate domain suggestion from lead data (without database lookup)
+ * Used during ingestion to auto-fill domains
+ */
+export function generateDomainSuggestionFromLeadData(
+  website: string | null | undefined,
+  contactEmail: string | null | undefined,
+  companyName: string | null | undefined
+): { suggestedDomain: string | null; confidence: Confidence; source: Source } {
+  // Try website first
+  if (website) {
+    const domainFromWebsite = extractDomainFromUrl(website);
+    if (domainFromWebsite) {
+      return {
+        suggestedDomain: domainFromWebsite,
+        confidence: 'high',
+        source: 'website',
+      };
+    }
+  }
+  
+  // Try email
+  if (contactEmail) {
+    const domain = extractDomainFromEmail(contactEmail);
+    if (domain) {
+      // Check if domain matches company name for high confidence
+      const matchesName = domainMatchesCompanyName(domain, companyName || null);
+      return {
+        suggestedDomain: domain,
+        confidence: matchesName ? 'high' : 'medium',
+        source: 'email',
+      };
+    }
+  }
+  
+  return {
+    suggestedDomain: null,
+    confidence: null,
+    source: null,
+  };
+}

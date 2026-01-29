@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { ingestBatchSchema, type LeadInput } from '@/lib/validators/ingest';
 import { generateDedupeKey } from '@/lib/utils/dedupe';
 import { normalizeCompanyName, normalizeEmail } from '@/lib/utils/normalize';
+import { generateDomainSuggestionFromLeadData, isInvalidDomain } from '@/lib/utils/domain-suggestion';
 import { LeadStatus } from '@prisma/client';
 
 // Authentication middleware
@@ -67,6 +68,10 @@ export async function POST(request: NextRequest) {
       updated: 0,
       skipped: 0,
       ids: [] as string[],
+      domainAutofill: {
+        applied: 0,
+        skipped: 0,
+      },
     };
     
     for (const leadInput of leadsInput) {
@@ -78,13 +83,18 @@ export async function POST(request: NextRequest) {
         } else {
           results.updated++;
         }
+        if (result.domainAutofilled) {
+          results.domainAutofill.applied++;
+        } else if (result.domainSkipped) {
+          results.domainAutofill.skipped++;
+        }
       } catch (error) {
         console.error('Error processing lead:', error);
         results.skipped++;
       }
     }
     
-    console.log(`Ingestion completed: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped`);
+    console.log(`Ingestion completed: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped, ${results.domainAutofill.applied} domains autofilled`);
     
     return NextResponse.json({
       success: true,
@@ -93,6 +103,7 @@ export async function POST(request: NextRequest) {
         updated: results.updated,
         skipped: results.skipped,
       },
+      domainAutofill: results.domainAutofill,
       ids: results.ids,
     });
     
@@ -109,14 +120,36 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function processLead(sourceId: string, leadInput: LeadInput): Promise<{ leadId: string; isNew: boolean }> {
+async function processLead(sourceId: string, leadInput: LeadInput): Promise<{ leadId: string; isNew: boolean; domainAutofilled: boolean; domainSkipped: boolean }> {
   // Normalize company name
   const companyNameNormalized = leadInput.company.name_normalized || 
     normalizeCompanyName(leadInput.company.name);
   
   // Normalize domain if provided
-  const normalizedDomain = leadInput.company.domain ? 
+  let normalizedDomain = leadInput.company.domain ? 
     leadInput.company.domain.toLowerCase().trim() : null;
+  
+  // Track domain autofill
+  let domainAutofilled = false;
+  let domainSkipped = false;
+  
+  // Auto-fill domain if missing or invalid
+  if (normalizedDomain === null || isInvalidDomain(normalizedDomain)) {
+    const suggestion = generateDomainSuggestionFromLeadData(
+      leadInput.company.website,
+      leadInput.contact?.email,
+      leadInput.company.name
+    );
+    
+    // Only apply if confidence is HIGH
+    if (suggestion.confidence === 'high' && suggestion.suggestedDomain) {
+      normalizedDomain = suggestion.suggestedDomain;
+      domainAutofilled = true;
+    } else if (suggestion.suggestedDomain) {
+      // Medium confidence - skip for admin tool
+      domainSkipped = true;
+    }
+  }
   
   // Generate dedupe key
   const dedupeKey = generateDedupeKey({
@@ -137,6 +170,7 @@ async function processLead(sourceId: string, leadInput: LeadInput): Promise<{ le
     update: {
       name: leadInput.company.name,
       nameNormalized: companyNameNormalized,
+      // Only update domain if it's null or invalid (never overwrite valid domains)
       domain: normalizedDomain,
       website: leadInput.company.website,
       industry: leadInput.company.industry,
@@ -314,5 +348,5 @@ async function processLead(sourceId: string, leadInput: LeadInput): Promise<{ le
     });
   }
   
-  return { leadId: lead.id, isNew };
+  return { leadId: lead.id, isNew, domainAutofilled, domainSkipped };
 }

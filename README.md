@@ -354,6 +354,10 @@ curl -X POST http://localhost:3000/api/ingest/leads \
     "updated": 0,
     "skipped": 0
   },
+  "domainAutofill": {
+    "applied": 1,
+    "skipped": 0
+  },
   "ids": ["uuid-1", "uuid-2"]
 }
 ```
@@ -364,6 +368,35 @@ curl -X POST http://localhost:3000/api/ingest/leads \
 - ✅ **Upsert automático**: Cria ou atualiza Account, Contact, Lead
 - ✅ **Histórico completo**: Cria ScoringRun e LeadStatusHistory
 - ✅ **Validação robusta**: Zod schemas para validação de payload
+- ✅ **Domain autofill**: Preenche/corrige domains automaticamente (ver abaixo)
+
+**Domain Autofill (Automático):**
+
+Durante a ingestão, o sistema tenta preencher ou corrigir o campo `domain` das contas:
+
+**Regras:**
+1. **Quando aplicar**: Se `account.domain` é `null` OU inválido (espaços, sem ponto, URL-like, etc.)
+2. **Heurísticas**: Extrai domain de `company.website` ou `contact.email`
+3. **Confidence threshold**: Só aplica se confidence = `HIGH`
+   - Website: sempre HIGH
+   - Email: HIGH se ≥2 emails ou match com nome da empresa
+4. **Proteção**: NUNCA sobrescreve domains válidos existentes
+
+**Comportamento:**
+- `domainAutofill.applied`: Domains preenchidos/corrigidos automaticamente
+- `domainAutofill.skipped`: Sugestões com confidence MEDIUM (usar admin tool)
+
+**Exemplo:**
+```json
+{
+  "company": {
+    "name": "Empresa Exemplo",
+    "domain": null,
+    "website": "https://www.exemplo.pt"
+  }
+}
+```
+→ Domain autofilled para `exemplo.pt` (confidence: HIGH, source: website)
 
 ### Leads Query API (Read)
 
