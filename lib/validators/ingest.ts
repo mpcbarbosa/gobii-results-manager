@@ -1,14 +1,23 @@
 import { z } from 'zod';
 
-// Source schema
-export const sourceSchema = z.object({
-  key: z.string().min(1, 'Source key is required'),
+// Source schema - accepts string or object
+export const sourceSchema = z.union([
+  z.string().min(1, 'Source key is required'),
+  z.object({
+    key: z.string().min(1, 'Source key is required'),
+  }),
+]).transform((val) => {
+  // Normalize to object format
+  if (typeof val === 'string') {
+    return { key: val };
+  }
+  return val;
 });
 
 // Company schema
 export const companySchema = z.object({
   name: z.string().min(1, 'Company name is required'),
-  domain: z.string().optional(),
+  domain: z.string().optional().nullable(),
   country: z.string().optional(),
   industry: z.string().optional(),
   size: z.string().optional(),
@@ -29,13 +38,21 @@ export const contactSchema = z.object({
 // Lead schema
 export const leadSchema = z.object({
   external_id: z.string().optional(),
+  source: z.union([
+    z.string().min(1),
+    z.object({ key: z.string().min(1) }),
+  ]).optional().transform((val) => {
+    if (!val) return undefined;
+    if (typeof val === 'string') return { key: val };
+    return val;
+  }),
   company: companySchema,
   contact: contactSchema.optional(),
-  trigger: z.string().min(1, 'Trigger is required'),
-  probability: z.number().min(0).max(1),
-  score_trigger: z.number().min(0).max(80),
-  score_probability: z.number().min(0).max(20),
-  score_final: z.number().min(0).max(100),
+  trigger: z.string().optional(),
+  probability: z.number().min(0).max(1).optional(),
+  score_trigger: z.number().min(0).max(80).optional(),
+  score_probability: z.number().min(0).max(20).optional(),
+  score_final: z.number().min(0).max(100).optional(),
   summary: z.string().optional(),
   raw: z.record(z.any()).optional(),
 });

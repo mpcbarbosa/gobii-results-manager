@@ -85,7 +85,13 @@ export async function POST(request: NextRequest) {
     
     for (const leadInput of leadsInput) {
       try {
-        const result = await processLead(source.id, leadInput);
+        // Determine source: lead.source > request.source
+        const leadSource = leadInput.source || sourceInput;
+        if (!leadSource || !leadSource.key) {
+          throw new Error('Source is required (either at request level or lead level)');
+        }
+        
+        const result = await processLead(leadSource.key, source.id, leadInput);
         results.ids.push(result.leadId);
         if (result.isNew) {
           results.created++;
@@ -129,7 +135,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function processLead(sourceId: string, leadInput: LeadInput): Promise<{ leadId: string; isNew: boolean; domainAutofilled: boolean; domainSkipped: boolean }> {
+async function processLead(sourceKey: string, sourceId: string, leadInput: LeadInput): Promise<{ leadId: string; isNew: boolean; domainAutofilled: boolean; domainSkipped: boolean }> {
   // Normalize company name
   const companyNameNormalized = leadInput.company.name_normalized || 
     normalizeCompanyName(leadInput.company.name);
@@ -162,11 +168,11 @@ async function processLead(sourceId: string, leadInput: LeadInput): Promise<{ le
   
   // Generate dedupe key
   const dedupeKey = generateDedupeKey({
-    sourceKey: sourceId,
+    sourceKey,
     companyName: leadInput.company.name,
     country: leadInput.company.country,
     contactEmail: leadInput.contact?.email,
-    trigger: leadInput.trigger,
+    trigger: leadInput.trigger || 'no-trigger',
   });
   
   // Upsert Account - use domain or fallback to name_normalized for unique constraint
@@ -269,23 +275,32 @@ async function processLead(sourceId: string, leadInput: LeadInput): Promise<{ le
   
   const isNew = !existingLead;
   
+  // Build score details if scores provided
+  const scoreDetails = (leadInput.score_trigger !== undefined || 
+                        leadInput.score_probability !== undefined || 
+                        leadInput.score_final !== undefined || 
+                        leadInput.probability !== undefined) ? {
+    trigger: leadInput.score_trigger,
+    probability: leadInput.score_probability,
+    final: leadInput.score_final,
+    probability_value: leadInput.probability,
+  } : undefined;
+  
+  // Build enriched data
+  const enrichedData = {
+    summary: leadInput.summary,
+    trigger: leadInput.trigger,
+    external_id: leadInput.external_id,
+  };
+  
   // Upsert Lead
   const lead = await prisma.lead.upsert({
     where: { dedupeKey },
     update: {
       score: leadInput.score_final,
-      scoreDetails: {
-        trigger: leadInput.score_trigger,
-        probability: leadInput.score_probability,
-        final: leadInput.score_final,
-        probability_value: leadInput.probability,
-      },
+      scoreDetails: scoreDetails || undefined,
       rawData: leadInput.raw,
-      enrichedData: {
-        summary: leadInput.summary,
-        trigger: leadInput.trigger,
-        external_id: leadInput.external_id,
-      },
+      enrichedData,
     },
     create: {
       dedupeKey,
@@ -293,40 +308,33 @@ async function processLead(sourceId: string, leadInput: LeadInput): Promise<{ le
       accountId: account.id,
       title: leadInput.contact?.role,
       score: leadInput.score_final,
-      scoreDetails: {
-        trigger: leadInput.score_trigger,
-        probability: leadInput.score_probability,
-        final: leadInput.score_final,
-        probability_value: leadInput.probability,
-      },
+      scoreDetails: scoreDetails || undefined,
       status: LeadStatus.NEW,
-      priority: Math.round(leadInput.score_final / 10), // Convert 0-100 to 0-10
+      priority: leadInput.score_final ? Math.round(leadInput.score_final / 10) : 0,
       rawData: leadInput.raw,
-      enrichedData: {
-        summary: leadInput.summary,
-        trigger: leadInput.trigger,
-        external_id: leadInput.external_id,
-      },
+      enrichedData,
     },
   });
   
-  // Create ScoringRun (always, for historical tracking)
-  await prisma.scoringRun.create({
-    data: {
-      sourceId,
-      leadId: lead.id,
-      score: leadInput.score_final,
-      scoreData: {
-        trigger: leadInput.score_trigger,
-        probability: leadInput.score_probability,
-        final: leadInput.score_final,
-        probability_value: leadInput.probability,
-        summary: leadInput.summary,
-        raw: leadInput.raw,
+  // Create ScoringRun (only if scores provided, for historical tracking)
+  if (leadInput.score_final !== undefined) {
+    await prisma.scoringRun.create({
+      data: {
+        sourceId,
+        leadId: lead.id,
+        score: leadInput.score_final,
+        scoreData: {
+          trigger: leadInput.score_trigger,
+          probability: leadInput.score_probability,
+          final: leadInput.score_final,
+          probability_value: leadInput.probability,
+          summary: leadInput.summary,
+          raw: leadInput.raw,
+        },
+        version: 'v1.0',
       },
-      version: 'v1.0',
-    },
-  });
+    });
+  }
   
   // Create LeadStatusHistory if new lead
   if (isNew) {

@@ -295,7 +295,26 @@ Content-Type: application/json
 - Token é trimmed antes da comparação
 - Comparação segura de tokens
 
-**Payload:**
+**Payload (Minimal - Scanner-Friendly):**
+```json
+{
+  "source": "LinkedInScanner",
+  "leads": [
+    {
+      "company": {
+        "name": "Empresa Exemplo Lda",
+        "website": "https://exemplo.pt"
+      },
+      "contact": {
+        "name": "João Silva",
+        "email": "joao@exemplo.pt"
+      }
+    }
+  ]
+}
+```
+
+**Payload (Completo - Legacy/Scorer):**
 ```json
 {
   "source": {
@@ -304,8 +323,10 @@ Content-Type: application/json
   "leads": [
     {
       "external_id": "optional-external-id",
+      "source": "SpecificScanner",
       "company": {
         "name": "Empresa Exemplo Lda",
+        "domain": null,
         "country": "PT",
         "industry": "Manufacturing",
         "size": "50-200",
@@ -332,6 +353,13 @@ Content-Type: application/json
   ]
 }
 ```
+
+**Campos Flexíveis:**
+- `source`: String ou objeto `{ key: string }` (normalizado internamente)
+- `lead.source`: String ou objeto (fallback para `request.source` se omitido)
+- `company.domain`: Opcional/null (autofill preenche se possível)
+- `trigger`, `probability`, `score_*`: Todos opcionais
+- `contact`: Opcional (mas recomendado para domain autofill)
 
 **Exemplo cURL:**
 ```bash
