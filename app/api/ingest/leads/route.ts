@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
         applied: 0,
         skipped: 0,
       },
+      debug: [] as Array<{ leadId: string; accountMatchedBy: string }>,
     };
     
     for (const leadInput of leadsInput) {
@@ -93,6 +94,7 @@ export async function POST(request: NextRequest) {
         
         const result = await processLead(leadSource.key, source.id, leadInput);
         results.ids.push(result.leadId);
+        results.debug.push({ leadId: result.leadId, accountMatchedBy: result.accountMatchedBy });
         if (result.isNew) {
           results.created++;
         } else {
@@ -119,6 +121,7 @@ export async function POST(request: NextRequest) {
         skipped: results.skipped,
       },
       domainAutofill: results.domainAutofill,
+      debug: results.debug,
       ids: results.ids,
     });
     
@@ -135,7 +138,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function processLead(sourceKey: string, sourceId: string, leadInput: LeadInput): Promise<{ leadId: string; isNew: boolean; domainAutofilled: boolean; domainSkipped: boolean }> {
+async function processLead(sourceKey: string, sourceId: string, leadInput: LeadInput): Promise<{ 
+  leadId: string; 
+  isNew: boolean; 
+  domainAutofilled: boolean; 
+  domainSkipped: boolean;
+  accountMatchedBy: 'domain' | 'suggested_domain' | 'name' | 'created';
+}> {
   // Normalize company name
   const companyNameNormalized = leadInput.company.name_normalized || 
     normalizeCompanyName(leadInput.company.name);
@@ -177,7 +186,7 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
   
   // Find or create Account with improved deduplication
   let account = null;
-  let _accountMatchedBy: 'domain' | 'suggested_domain' | 'name' | 'created' = 'created';
+  let accountMatchedBy: 'domain' | 'suggested_domain' | 'name' | 'created' = 'created';
   
   // Priority A: Try to find by valid domain
   if (normalizedDomain && !isInvalidDomain(normalizedDomain)) {
@@ -185,7 +194,7 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
       where: { domain: normalizedDomain },
     });
     if (account) {
-      _accountMatchedBy = 'domain';
+      accountMatchedBy = 'domain';
     }
   }
   
@@ -195,7 +204,7 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
       where: { domain: normalizedDomain },
     });
     if (account) {
-      _accountMatchedBy = 'suggested_domain';
+      accountMatchedBy = 'suggested_domain';
     }
   }
   
@@ -208,7 +217,7 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
       },
     });
     if (account) {
-      _accountMatchedBy = 'name';
+      accountMatchedBy = 'name';
     }
   }
   
@@ -241,7 +250,7 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
         country: leadInput.company.country,
       },
     });
-    _accountMatchedBy = 'created';
+    accountMatchedBy = 'created';
   }
   
   // Upsert Contact if email provided
@@ -406,5 +415,5 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
     });
   }
   
-  return { leadId: lead.id, isNew, domainAutofilled, domainSkipped };
+  return { leadId: lead.id, isNew, domainAutofilled, domainSkipped, accountMatchedBy };
 }

@@ -469,6 +469,30 @@ O sistema previne duplicação de contas usando uma estratégia em cascata:
   "company": { "name": "EMPRESA EXEMPLO UNIPESSOAL" }
 }
 → Account matched por nameNormalized="empresa exemplo" (não duplicado)
+
+// Ingest 4: Com acentos portugueses → reutiliza conta
+{
+  "company": { "name": "Empresa Normalização Lda" }
+}
+→ nameNormalized="empresa normalizacao" (remove acentos)
+
+// Ingest 5: Mesmo nome sem acentos → reutiliza conta
+{
+  "company": { "name": "EMPRESA NORMALIZACAO UNIPESSOAL" }
+}
+→ Account matched por nameNormalized="empresa normalizacao" (não duplicado)
+```
+
+**Debug Info:**
+A resposta inclui um campo `debug` com informação sobre como cada account foi matched:
+```json
+{
+  "debug": [
+    { "leadId": "uuid-1", "accountMatchedBy": "domain" },
+    { "leadId": "uuid-2", "accountMatchedBy": "name" },
+    { "leadId": "uuid-3", "accountMatchedBy": "created" }
+  ]
+}
 ```
 
 **Lead Idempotency:**
