@@ -175,33 +175,74 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
     trigger: leadInput.trigger || 'no-trigger',
   });
   
-  // Upsert Account - use domain or fallback to name_normalized for unique constraint
-  const accountLookupKey = normalizedDomain || `fallback-${companyNameNormalized}-${leadInput.company.country || 'unknown'}`;
+  // Find or create Account with improved deduplication
+  let account = null;
+  let _accountMatchedBy: 'domain' | 'suggested_domain' | 'name' | 'created' = 'created';
   
-  const account = await prisma.account.upsert({
-    where: {
-      domain: accountLookupKey,
-    },
-    update: {
-      name: leadInput.company.name,
-      nameNormalized: companyNameNormalized,
-      // Only update domain if it's null or invalid (never overwrite valid domains)
-      domain: normalizedDomain,
-      website: leadInput.company.website,
-      industry: leadInput.company.industry,
-      size: leadInput.company.size,
-      country: leadInput.company.country,
-    },
-    create: {
-      name: leadInput.company.name,
-      nameNormalized: companyNameNormalized,
-      domain: normalizedDomain,
-      website: leadInput.company.website,
-      industry: leadInput.company.industry,
-      size: leadInput.company.size,
-      country: leadInput.company.country,
-    },
-  });
+  // Priority A: Try to find by valid domain
+  if (normalizedDomain && !isInvalidDomain(normalizedDomain)) {
+    account = await prisma.account.findUnique({
+      where: { domain: normalizedDomain },
+    });
+    if (account) {
+      _accountMatchedBy = 'domain';
+    }
+  }
+  
+  // Priority B: Try to find by suggested domain (if HIGH confidence)
+  if (!account && domainAutofilled && normalizedDomain) {
+    account = await prisma.account.findUnique({
+      where: { domain: normalizedDomain },
+    });
+    if (account) {
+      _accountMatchedBy = 'suggested_domain';
+    }
+  }
+  
+  // Priority C: Try to find by normalized name
+  if (!account) {
+    account = await prisma.account.findFirst({
+      where: {
+        nameNormalized: companyNameNormalized,
+        deletedAt: null,
+      },
+    });
+    if (account) {
+      _accountMatchedBy = 'name';
+    }
+  }
+  
+  // Create or update account
+  if (account) {
+    // Update existing account
+    account = await prisma.account.update({
+      where: { id: account.id },
+      data: {
+        name: leadInput.company.name,
+        nameNormalized: companyNameNormalized,
+        // Only update domain if current is null or invalid
+        domain: (account.domain === null || isInvalidDomain(account.domain)) ? normalizedDomain : account.domain,
+        website: leadInput.company.website || account.website,
+        industry: leadInput.company.industry || account.industry,
+        size: leadInput.company.size || account.size,
+        country: leadInput.company.country || account.country,
+      },
+    });
+  } else {
+    // Create new account
+    account = await prisma.account.create({
+      data: {
+        name: leadInput.company.name,
+        nameNormalized: companyNameNormalized,
+        domain: normalizedDomain,
+        website: leadInput.company.website,
+        industry: leadInput.company.industry,
+        size: leadInput.company.size,
+        country: leadInput.company.country,
+      },
+    });
+    _accountMatchedBy = 'created';
+  }
   
   // Upsert Contact if email provided
   let _contactId: string | undefined; // Reserved for future use

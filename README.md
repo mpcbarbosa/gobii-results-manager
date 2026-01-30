@@ -435,6 +435,47 @@ Durante a ingestão, o sistema tenta preencher ou corrigir o campo `domain` das 
 ```
 → Domain autofilled para `exemplo.pt` (confidence: HIGH, source: website)
 
+**Account Deduplication (Inteligente):**
+
+O sistema previne duplicação de contas usando uma estratégia em cascata:
+
+**Prioridade de matching:**
+1. **Domain válido**: Se `company.domain` existe e é válido → busca por domain
+2. **Suggested domain**: Se domain foi autofilled com HIGH confidence → busca por suggested domain
+3. **Nome normalizado**: Busca por `nameNormalized` (lowercase, sem sufixos legais)
+
+**Normalização de nomes:**
+- Lowercase + trim
+- Remove sufixos: "lda", "sa", "unipessoal", "ltd", "limited", "inc", "corp", "llc"
+- Colapsa espaços múltiplos
+
+**Exemplos de deduplicação:**
+
+```json
+// Ingest 1: Cria nova conta
+{
+  "company": { "name": "Empresa Exemplo Lda", "website": "https://exemplo.pt" }
+}
+→ Account criado com domain="exemplo.pt", nameNormalized="empresa exemplo"
+
+// Ingest 2: Mesmo domain → reutiliza conta
+{
+  "company": { "name": "Empresa Exemplo SA", "domain": "exemplo.pt" }
+}
+→ Account matched por domain, atualizado (não duplicado)
+
+// Ingest 3: Mesmo nome normalizado → reutiliza conta
+{
+  "company": { "name": "EMPRESA EXEMPLO UNIPESSOAL" }
+}
+→ Account matched por nameNormalized="empresa exemplo" (não duplicado)
+```
+
+**Lead Idempotency:**
+- Usa `dedupeKey` (SHA256 hash de source + company + contact + trigger)
+- Mesmo lead não é duplicado
+- Counts refletem created vs updated corretamente
+
 ### Leads Query API (Read)
 
 Endpoints para consultar e listar leads (requer `APP_READ_TOKEN`).
