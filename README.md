@@ -1147,6 +1147,95 @@ $result | ConvertTo-Json
 - ✅ **Ignora providers pessoais**: gmail, outlook, hotmail, etc.
 - ✅ **Relatório detalhado**: Updated + skipped com razões
 
+#### POST /api/admin/accounts/merge
+
+Merge duas contas duplicadas de forma segura, repontando todos os registos relacionados.
+
+**⚠️ ATENÇÃO**: Operação destrutiva. Use com cuidado.
+
+**Autenticação:** Bearer token via header `Authorization`
+
+**Headers:**
+```
+Authorization: Bearer YOUR_APP_ADMIN_TOKEN
+Content-Type: application/json
+```
+
+**Payload:**
+```json
+{
+  "sourceAccountId": "uuid-da-conta-origem",
+  "targetAccountId": "uuid-da-conta-destino",
+  "deleteSource": true
+}
+```
+
+**Parâmetros:**
+- `sourceAccountId`: Conta a ser merged (será apagada/arquivada)
+- `targetAccountId`: Conta destino (receberá todos os dados)
+- `deleteSource`: Se `true`, soft-delete da conta origem (default: `true`)
+
+**Comportamento:**
+1. Valida que ambas as contas existem
+2. Reaponta todos os registos relacionados:
+   - `leads.accountId` → target
+   - `contacts.accountId` → target
+3. Merge de campos da conta:
+   - Mantém `target.name` a menos que vazio
+   - `domain`: mantém target se válido, senão usa source se válido
+   - Outros campos: usa target se preenchido, senão source
+4. Soft-delete da conta origem (se `deleteSource=true`)
+
+**Exemplo PowerShell:**
+```powershell
+$headers = @{
+    "Authorization" = "Bearer your-admin-token"
+    "Content-Type" = "application/json"
+}
+
+# Primeiro, listar contas duplicadas
+$accounts = Invoke-RestMethod -Uri "http://localhost:3000/api/admin/accounts?q=exemplo" -Headers $headers
+$accounts.items | Format-Table id, name, domain
+
+# Merge: source -> target
+$body = @{
+    sourceAccountId = "uuid-source"
+    targetAccountId = "uuid-target"
+    deleteSource = $true
+} | ConvertTo-Json
+
+$result = Invoke-RestMethod -Uri "http://localhost:3000/api/admin/accounts/merge" `
+    -Method Post -Headers $headers -Body $body
+$result | ConvertTo-Json
+```
+
+**Resposta:**
+```json
+{
+  "success": true,
+  "sourceAccountId": "uuid-source",
+  "targetAccountId": "uuid-target",
+  "deleted": true,
+  "counts": {
+    "leads": 5,
+    "contacts": 3
+  }
+}
+```
+
+**Características:**
+- ✅ **Transação atómica**: Rollback automático em caso de erro
+- ✅ **Repontamento completo**: Leads, contacts, e relações
+- ✅ **Merge inteligente**: Preserva dados válidos
+- ✅ **Soft delete**: Conta origem arquivada (não hard delete)
+- ✅ **Validação rigorosa**: Previne merge de conta consigo mesma
+- ✅ **Relatório detalhado**: Counts por tabela atualizada
+
+**Casos de uso:**
+- Corrigir duplicações históricas
+- Consolidar contas após identificar duplicados
+- Limpar base de dados antes de produção
+
 ## Próximos Passos
 
 Este projeto completou:
