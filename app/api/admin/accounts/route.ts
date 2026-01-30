@@ -39,14 +39,23 @@ export async function GET(request: NextRequest) {
     );
     const skip = parseInt(searchParams.get('skip') || '0', 10);
     const q = searchParams.get('q') || undefined;
+    const showDeleted = searchParams.get('showDeleted') === 'true';
     
     // Build where clause
-    const where = q ? {
-      OR: [
+    const where: Record<string, unknown> = {};
+    
+    // Hide soft-deleted accounts by default
+    if (!showDeleted) {
+      where.deletedAt = null;
+    }
+    
+    // Add search filter
+    if (q) {
+      where.OR = [
         { name: { contains: q, mode: 'insensitive' as const } },
         { domain: { contains: q, mode: 'insensitive' as const } },
-      ],
-    } : {};
+      ];
+    }
     
     // Get total count
     const count = await prisma.account.count({ where });
