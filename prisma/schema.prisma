@@ -169,6 +169,11 @@ model Lead {
   enrichedData      Json?     @map("enriched_data") // Additional enrichment data
   tags              String[]  @default([])
   
+  // Triage fields
+  notes             String?   @db.Text // Admin notes for triage
+  owner             String?   // Owner/assignee for triage
+  nextActionAt      DateTime? @map("next_action_at") // Next action date
+  
   // Soft delete
   deletedAt         DateTime? @map("deleted_at")
   

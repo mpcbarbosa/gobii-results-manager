@@ -1236,6 +1236,80 @@ $result | ConvertTo-Json
 - Consolidar contas após identificar duplicados
 - Limpar base de dados antes de produção
 
+#### PATCH /api/admin/leads/[id]
+
+Atualiza status, notas e campos de triagem de um lead específico.
+
+**Autenticação:** Bearer token via header `Authorization`
+
+**Headers:**
+```
+Authorization: Bearer YOUR_APP_ADMIN_TOKEN
+Content-Type: application/json
+```
+
+**Payload (todos os campos opcionais):**
+```json
+{
+  "status": "QUALIFIED",
+  "notes": "Lead qualificado após call. Interesse em SAP S/4HANA.",
+  "owner": "operator@gobii.com",
+  "nextActionAt": "2026-02-15T10:00:00.000Z"
+}
+```
+
+**Status válidos:**
+- `NEW`, `REVIEWING`, `QUALIFIED`, `DISQUALIFIED`, `CONTACTED`, `ENGAGED`, `NURTURING`, `READY_HANDOFF`, `HANDED_OFF`, `ARCHIVED`
+
+**Exemplo PowerShell:**
+```powershell
+$headers = @{
+    "Authorization" = "Bearer your-admin-token"
+    "Content-Type" = "application/json"
+}
+
+$body = @{
+    status = "QUALIFIED"
+    notes = "Lead qualificado após call inicial"
+    owner = "operator@gobii.com"
+    nextActionAt = (Get-Date).AddDays(7).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+} | ConvertTo-Json
+
+$leadId = "uuid-do-lead"
+$result = Invoke-RestMethod -Uri "http://localhost:3000/api/admin/leads/$leadId" `
+    -Method Patch -Headers $headers -Body $body
+$result.lead | Format-List
+```
+
+**Resposta:**
+```json
+{
+  "success": true,
+  "lead": {
+    "id": "uuid",
+    "status": "QUALIFIED",
+    "score": 87,
+    "summary": "Empresa em migração SAP",
+    "trigger": "Implementação S/4HANA",
+    "probability": 0.85,
+    "notes": "Lead qualificado após call",
+    "owner": "operator@gobii.com",
+    "nextActionAt": "2026-02-15T10:00:00.000Z",
+    "createdAt": "2026-01-30T10:00:00.000Z",
+    "updatedAt": "2026-01-31T09:30:00.000Z",
+    "source": {...},
+    "account": {...}
+  }
+}
+```
+
+**Características:**
+- ✅ **Validação de status**: Apenas valores válidos aceites
+- ✅ **ISO 8601**: nextActionAt validado como data ISO
+- ✅ **Campos opcionais**: Atualiza apenas campos fornecidos
+- ✅ **404 se não existir**: Lead não encontrado
+- ✅ **400 em payload inválido**: Mensagens claras de erro
+
 #### GET /api/admin/leads/export.csv
 
 Exporta leads para CSV (formato Excel PT) para análise offline ou integração com outras ferramentas.
@@ -1266,7 +1340,7 @@ Authorization: Bearer YOUR_APP_ADMIN_TOKEN
 **Formato CSV:**
 - **Separador**: `;` (ponto e vírgula, compatível com Excel PT)
 - **Encoding**: UTF-8 com BOM
-- **Colunas**: id, createdAt, updatedAt, status, score, trigger, probability, summary, accountId, accountName, accountDomain, dedupeKey, sourceKey, deletedAt
+- **Colunas**: id, createdAt, updatedAt, status, score, trigger, probability, summary, accountId, accountName, accountDomain, dedupeKey, sourceKey, deletedAt, notes, owner, nextActionAt
 
 **Exemplo PowerShell:**
 ```powershell

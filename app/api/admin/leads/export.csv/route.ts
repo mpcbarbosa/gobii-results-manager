@@ -131,6 +131,9 @@ export async function GET(request: NextRequest) {
         scoreDetails: true,
         enrichedData: true,
         accountId: true,
+        notes: true,
+        owner: true,
+        nextActionAt: true,
         createdAt: true,
         updatedAt: true,
         deletedAt: true,
@@ -157,7 +160,7 @@ export async function GET(request: NextRequest) {
     const rows: string[] = [];
     
     // Header row (Excel PT: semicolon separator)
-    rows.push('id;createdAt;updatedAt;status;score;trigger;probability;summary;accountId;accountName;accountDomain;dedupeKey;sourceKey;deletedAt');
+    rows.push('id;createdAt;updatedAt;status;score;trigger;probability;summary;accountId;accountName;accountDomain;dedupeKey;sourceKey;deletedAt;notes;owner;nextActionAt');
     
     // Data rows
     for (const lead of leads) {
@@ -196,6 +199,9 @@ export async function GET(request: NextRequest) {
         escapeCsvField(lead.dedupeKey),
         escapeCsvField(lead.source.name),
         escapeCsvField(lead.deletedAt ? lead.deletedAt.toISOString() : ''),
+        escapeCsvField(lead.notes),
+        escapeCsvField(lead.owner),
+        escapeCsvField(lead.nextActionAt ? lead.nextActionAt.toISOString() : ''),
       ].join(';');
       
       rows.push(row);
