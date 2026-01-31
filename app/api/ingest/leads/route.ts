@@ -344,13 +344,18 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
   };
   
   // Upsert Lead
+  const now = new Date();
   const lead = await prisma.lead.upsert({
     where: { dedupeKey },
     update: {
-      score: leadInput.score_final,
+      // Update scores if provided
+      score: leadInput.score_final !== undefined ? leadInput.score_final : undefined,
       scoreDetails: scoreDetails || undefined,
-      rawData: leadInput.raw,
+      rawData: leadInput.raw || undefined,
       enrichedData,
+      // Increment seen count and update last seen
+      seenCount: existingLead ? existingLead.seenCount + 1 : 1,
+      lastSeenAt: now,
     },
     create: {
       dedupeKey,
@@ -363,6 +368,8 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
       priority: leadInput.score_final ? Math.round(leadInput.score_final / 10) : 0,
       rawData: leadInput.raw,
       enrichedData,
+      seenCount: 1,
+      lastSeenAt: now,
     },
   });
   

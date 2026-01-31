@@ -495,10 +495,33 @@ A resposta inclui um campo `debug` com informação sobre como cada account foi 
 }
 ```
 
-**Lead Idempotency:**
+**Lead Idempotency & Hotness Tracking:**
 - Usa `dedupeKey` (SHA256 hash de source + company + contact + trigger)
 - Mesmo lead não é duplicado
+- **Hotness tracking**:
+  - `seenCount`: Incrementado cada vez que o lead reaparece
+  - `lastSeenAt`: Atualizado com timestamp da última aparição
+  - Útil para identificar leads "quentes" (reaparecem frequentemente)
 - Counts refletem created vs updated corretamente
+
+**Exemplo de hotness:**
+```json
+// Ingest 1: Lead novo
+{ "company": { "name": "Empresa X" }, "trigger": "SAP migration" }
+→ created=1, seenCount=1, lastSeenAt=2026-01-31T09:00:00Z
+
+// Ingest 2: Mesmo lead (mesmo dedupeKey)
+{ "company": { "name": "Empresa X" }, "trigger": "SAP migration" }
+→ updated=1, seenCount=2, lastSeenAt=2026-01-31T10:00:00Z
+
+// Ingest 3: Mesmo lead novamente
+→ updated=1, seenCount=3, lastSeenAt=2026-01-31T11:00:00Z
+```
+
+**Benefícios:**
+- Identifica leads persistentes (alto interesse)
+- Prioriza leads que reaparecem frequentemente
+- Reduz ruído operacional (não cria duplicados)
 
 ### Leads Query API (Read)
 
@@ -1310,6 +1333,62 @@ $result.lead | Format-List
 - ✅ **404 se não existir**: Lead não encontrado
 - ✅ **400 em payload inválido**: Mensagens claras de erro
 
+#### GET /api/admin/leads
+
+Lista leads com filtros avançados e ordenação por hotness.
+
+**Autenticação:** Bearer token via header `Authorization`
+
+**Headers:**
+```
+Authorization: Bearer YOUR_APP_ADMIN_TOKEN
+```
+
+**Query Parameters:**
+
+| Parâmetro | Tipo | Default | Descrição |
+|-----------|------|---------|-----------|
+| `take` | number | 50 | Número de leads (max 200) |
+| `skip` | number | 0 | Offset para paginação |
+| `accountId` | string | - | Filtrar por conta específica |
+| `source` | string | - | Filtrar por source key |
+| `minScore` | number | - | Score mínimo |
+| `maxScore` | number | - | Score máximo |
+| `q` | string | - | Pesquisa em summary, account name, domain, website |
+| `showDeleted` | boolean | false | Incluir leads soft-deleted |
+| `sort` | string | updated | `updated` (default) ou `hot` (por lastSeenAt/seenCount) |
+
+**Exemplo PowerShell (leads "quentes"):**
+```powershell
+$headers = @{ "Authorization" = "Bearer your-admin-token" }
+
+# Listar leads mais "quentes" (reaparecem frequentemente)
+$response = Invoke-RestMethod -Uri "http://localhost:3000/api/admin/leads?sort=hot&take=20" -Headers $headers
+$response.items | Format-Table id, seenCount, lastSeenAt, summary, accountName
+```
+
+**Resposta:**
+```json
+{
+  "success": true,
+  "take": 20,
+  "skip": 0,
+  "count": 150,
+  "items": [
+    {
+      "id": "uuid",
+      "summary": "Lead summary",
+      "seenCount": 3,
+      "lastSeenAt": "2026-01-31T11:00:00.000Z",
+      "score_final": 87,
+      "accountName": "Empresa Exemplo",
+      "notes": "Qualificado",
+      "owner": "operator@gobii.com"
+    }
+  ]
+}
+```
+
 #### GET /api/admin/leads/export.csv
 
 Exporta leads para CSV (formato Excel PT) para análise offline ou integração com outras ferramentas.
@@ -1340,7 +1419,7 @@ Authorization: Bearer YOUR_APP_ADMIN_TOKEN
 **Formato CSV:**
 - **Separador**: `;` (ponto e vírgula, compatível com Excel PT)
 - **Encoding**: UTF-8 com BOM
-- **Colunas**: id, createdAt, updatedAt, status, score, trigger, probability, summary, accountId, accountName, accountDomain, dedupeKey, sourceKey, deletedAt, notes, owner, nextActionAt
+- **Colunas**: id, createdAt, updatedAt, status, score, trigger, probability, summary, accountId, accountName, accountDomain, dedupeKey, sourceKey, deletedAt, notes, owner, nextActionAt, seenCount, lastSeenAt
 
 **Exemplo PowerShell:**
 ```powershell

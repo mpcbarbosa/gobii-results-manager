@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
     const maxScore = searchParams.get('maxScore') ? parseFloat(searchParams.get('maxScore')!) : undefined;
     const q = searchParams.get('q') || undefined;
     const showDeleted = searchParams.get('showDeleted') === 'true';
+    const sort = searchParams.get('sort') || 'updated';
     
     // Build where clause
     const where: Record<string, unknown> = {};
@@ -122,6 +123,8 @@ export async function GET(request: NextRequest) {
         notes: true,
         owner: true,
         nextActionAt: true,
+        seenCount: true,
+        lastSeenAt: true,
         createdAt: true,
         updatedAt: true,
         deletedAt: true,
@@ -141,8 +144,12 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: {
-        createdAt: 'desc',
+      orderBy: sort === 'hot' ? [
+        { lastSeenAt: 'desc' },
+        { seenCount: 'desc' },
+        { updatedAt: 'desc' },
+      ] : {
+        updatedAt: 'desc',
       },
       take,
       skip,
@@ -201,6 +208,8 @@ export async function GET(request: NextRequest) {
         notes: lead.notes,
         owner: lead.owner,
         nextActionAt: lead.nextActionAt,
+        seenCount: lead.seenCount,
+        lastSeenAt: lead.lastSeenAt,
         company: {
           name: lead.account.name,
           domain: lead.account.domain,

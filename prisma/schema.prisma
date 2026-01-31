@@ -174,6 +174,10 @@ model Lead {
   owner             String?   // Owner/assignee for triage
   nextActionAt      DateTime? @map("next_action_at") // Next action date
   
+  // Hotness tracking
+  seenCount         Int       @default(1) @map("seen_count") // Number of times lead appeared
+  lastSeenAt        DateTime? @map("last_seen_at") // Last time lead was seen/updated
+  
   // Soft delete
   deletedAt         DateTime? @map("deleted_at")
   

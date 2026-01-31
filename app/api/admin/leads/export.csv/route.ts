@@ -134,6 +134,8 @@ export async function GET(request: NextRequest) {
         notes: true,
         owner: true,
         nextActionAt: true,
+        seenCount: true,
+        lastSeenAt: true,
         createdAt: true,
         updatedAt: true,
         deletedAt: true,
@@ -160,7 +162,7 @@ export async function GET(request: NextRequest) {
     const rows: string[] = [];
     
     // Header row (Excel PT: semicolon separator)
-    rows.push('id;createdAt;updatedAt;status;score;trigger;probability;summary;accountId;accountName;accountDomain;dedupeKey;sourceKey;deletedAt;notes;owner;nextActionAt');
+    rows.push('id;createdAt;updatedAt;status;score;trigger;probability;summary;accountId;accountName;accountDomain;dedupeKey;sourceKey;deletedAt;notes;owner;nextActionAt;seenCount;lastSeenAt');
     
     // Data rows
     for (const lead of leads) {
@@ -202,6 +204,8 @@ export async function GET(request: NextRequest) {
         escapeCsvField(lead.notes),
         escapeCsvField(lead.owner),
         escapeCsvField(lead.nextActionAt ? lead.nextActionAt.toISOString() : ''),
+        escapeCsvField(lead.seenCount),
+        escapeCsvField(lead.lastSeenAt ? lead.lastSeenAt.toISOString() : ''),
       ].join(';');
       
       rows.push(row);
