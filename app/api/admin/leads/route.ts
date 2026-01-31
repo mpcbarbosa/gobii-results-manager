@@ -35,18 +35,21 @@ export async function GET(request: NextRequest) {
     
     const take = Math.min(
       parseInt(searchParams.get('take') || '50', 10),
-      100
+      200
     );
     const skip = parseInt(searchParams.get('skip') || '0', 10);
     const accountId = searchParams.get('accountId') || undefined;
+    const source = searchParams.get('source') || undefined;
+    const minScore = searchParams.get('minScore') ? parseFloat(searchParams.get('minScore')!) : undefined;
+    const maxScore = searchParams.get('maxScore') ? parseFloat(searchParams.get('maxScore')!) : undefined;
     const q = searchParams.get('q') || undefined;
-    const includeDeleted = searchParams.get('includeDeleted') === 'true';
+    const showDeleted = searchParams.get('showDeleted') === 'true';
     
     // Build where clause
     const where: Record<string, unknown> = {};
     
     // Filter by deleted status
-    if (!includeDeleted) {
+    if (!showDeleted) {
       where.deletedAt = null;
     }
     
@@ -55,12 +58,40 @@ export async function GET(request: NextRequest) {
       where.accountId = accountId;
     }
     
-    // Text search in account name or lead enrichedData
+    // Filter by source
+    if (source) {
+      where.source = {
+        name: source,
+      };
+    }
+    
+    // Filter by score range
+    if (minScore !== undefined || maxScore !== undefined) {
+      where.score = {};
+      if (minScore !== undefined) {
+        (where.score as Record<string, unknown>).gte = minScore;
+      }
+      if (maxScore !== undefined) {
+        (where.score as Record<string, unknown>).lte = maxScore;
+      }
+    }
+    
+    // Text search in multiple fields
     if (q) {
       where.OR = [
         {
           account: {
             name: { contains: q, mode: 'insensitive' as const },
+          },
+        },
+        {
+          account: {
+            domain: { contains: q, mode: 'insensitive' as const },
+          },
+        },
+        {
+          account: {
+            website: { contains: q, mode: 'insensitive' as const },
           },
         },
         {
@@ -83,20 +114,32 @@ export async function GET(request: NextRequest) {
         dedupeKey: true,
         status: true,
         score: true,
+        scoreDetails: true,
         enrichedData: true,
+        rawData: true,
         accountId: true,
+        title: true,
         createdAt: true,
         updatedAt: true,
         deletedAt: true,
+        source: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        },
         account: {
           select: {
+            id: true,
             name: true,
             domain: true,
+            website: true,
           },
         },
       },
       orderBy: {
-        updatedAt: 'desc',
+        createdAt: 'desc',
       },
       take,
       skip,
@@ -104,25 +147,68 @@ export async function GET(request: NextRequest) {
     
     // Format items
     const items = leads.map(lead => {
-      // Extract summary from enrichedData
+      // Extract data from enrichedData
       let summary: string | undefined;
+      let trigger: string | undefined;
+      let _externalId: string | undefined;
       if (lead.enrichedData && typeof lead.enrichedData === 'object' && lead.enrichedData !== null) {
         const enriched = lead.enrichedData as Record<string, unknown>;
         summary = typeof enriched.summary === 'string' ? enriched.summary : undefined;
+        trigger = typeof enriched.trigger === 'string' ? enriched.trigger : undefined;
+        _externalId = typeof enriched.external_id === 'string' ? enriched.external_id : undefined;
+      }
+      
+      // Extract data from scoreDetails
+      let probability: number | undefined;
+      let scoreTrigger: number | undefined;
+      let scoreProbability: number | undefined;
+      if (lead.scoreDetails && typeof lead.scoreDetails === 'object' && lead.scoreDetails !== null) {
+        const details = lead.scoreDetails as Record<string, unknown>;
+        probability = (typeof details.probability_value === 'number' ? details.probability_value : undefined) || 
+                      (typeof details.probability === 'number' ? details.probability : undefined);
+        scoreTrigger = typeof details.trigger === 'number' ? details.trigger : undefined;
+        scoreProbability = typeof details.probability === 'number' ? details.probability : undefined;
+      }
+      
+      // Extract contact from rawData if available
+      let contactName: string | undefined;
+      let contactEmail: string | undefined;
+      if (lead.rawData && typeof lead.rawData === 'object' && lead.rawData !== null) {
+        const raw = lead.rawData as Record<string, unknown>;
+        if (raw.contact && typeof raw.contact === 'object') {
+          const contact = raw.contact as Record<string, unknown>;
+          contactName = typeof contact.name === 'string' ? contact.name : 
+                       (typeof contact.full_name === 'string' ? contact.full_name : undefined);
+          contactEmail = typeof contact.email === 'string' ? contact.email : undefined;
+        }
       }
       
       return {
         id: lead.id,
-        dedupeKey: lead.dedupeKey,
-        status: lead.status,
-        score: lead.score,
-        summary,
-        accountId: lead.accountId,
-        accountName: lead.account.name,
-        accountDomain: lead.account.domain,
         createdAt: lead.createdAt,
         updatedAt: lead.updatedAt,
-        deletedAt: lead.deletedAt,
+        summary,
+        trigger,
+        probability,
+        score_trigger: scoreTrigger,
+        score_probability: scoreProbability,
+        score_final: lead.score,
+        source: lead.source.name,
+        accountId: lead.accountId,
+        company: {
+          name: lead.account.name,
+          domain: lead.account.domain,
+          website: lead.account.website,
+        },
+        contact: contactName || contactEmail ? {
+          name: contactName,
+          email: contactEmail,
+        } : null,
+        account: {
+          id: lead.account.id,
+          name: lead.account.name,
+          domain: lead.account.domain,
+        },
       };
     });
     
