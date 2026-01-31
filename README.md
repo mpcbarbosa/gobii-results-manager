@@ -1236,6 +1236,77 @@ $result | ConvertTo-Json
 - Consolidar contas após identificar duplicados
 - Limpar base de dados antes de produção
 
+#### GET /api/admin/leads/export.csv
+
+Exporta leads para CSV (formato Excel PT) para análise offline ou integração com outras ferramentas.
+
+**⚠️ ATENÇÃO**: Dados sensíveis. Uso restrito a administradores.
+
+**Autenticação:** Bearer token via header `Authorization`
+
+**Headers:**
+```
+Authorization: Bearer YOUR_APP_ADMIN_TOKEN
+```
+
+**Query Parameters:**
+
+| Parâmetro | Tipo | Default | Descrição |
+|-----------|------|---------|-----------|
+| `take` | number | 200 | Número de leads (max 5000) |
+| `skip` | number | 0 | Offset para paginação |
+| `accountId` | string | - | Filtrar por conta específica |
+| `status` | string | - | Filtrar por status do lead |
+| `source` | string | - | Filtrar por source key |
+| `dateFrom` | string | - | Data inicial (ISO 8601) |
+| `dateTo` | string | - | Data final (ISO 8601) |
+| `q` | string | - | Pesquisa em summary, account name, domain |
+| `showDeleted` | boolean | false | Incluir leads soft-deleted |
+
+**Formato CSV:**
+- **Separador**: `;` (ponto e vírgula, compatível com Excel PT)
+- **Encoding**: UTF-8 com BOM
+- **Colunas**: id, createdAt, updatedAt, status, score, trigger, probability, summary, accountId, accountName, accountDomain, dedupeKey, sourceKey, deletedAt
+
+**Exemplo PowerShell:**
+```powershell
+$headers = @{
+    "Authorization" = "Bearer your-admin-token"
+}
+
+# Exportar leads dos últimos 7 dias
+$dateFrom = (Get-Date).AddDays(-7).ToString("yyyy-MM-ddTHH:mm:ss.fffZ")
+$uri = "http://localhost:3000/api/admin/leads/export.csv?dateFrom=$dateFrom&take=1000"
+
+Invoke-WebRequest -Uri $uri -Headers $headers -OutFile "leads_export.csv"
+Write-Host "Exported to leads_export.csv"
+
+# Abrir no Excel
+Start-Process "leads_export.csv"
+```
+
+**Exemplo cURL:**
+```bash
+curl -X GET "http://localhost:3000/api/admin/leads/export.csv?take=500&status=NEW" \
+  -H "Authorization: Bearer your-admin-token" \
+  -o leads_export.csv
+```
+
+**Características:**
+- ✅ **Excel PT compatível**: Separador `;` e UTF-8 BOM
+- ✅ **Escaping seguro**: Campos com `;`, `"` ou newlines escapados
+- ✅ **Filtros completos**: Mesmos filtros do endpoint JSON
+- ✅ **Paginação**: Até 5000 leads por export
+- ✅ **Ordenação**: Por createdAt desc (mais recentes primeiro)
+- ✅ **Dados completos**: Scores, trigger, probability, summary
+
+**Casos de uso:**
+- Análise offline em Excel
+- Relatórios para stakeholders
+- Backup de dados
+- Integração com ferramentas externas
+- Review manual de leads
+
 ## Próximos Passos
 
 Este projeto completou:
