@@ -31,7 +31,7 @@ export default function AdminLoginPage() {
       }
 
       window.location.href = nextPath;
-    } catch (err) {
+    } catch {
       setError("Erro ao autenticar. Tenta novamente.");
       setLoading(false);
     }
@@ -63,7 +63,15 @@ export default function AdminLoginPage() {
         />
 
         {error && (
-          <div style={{ background: "#ffe5e5", border: "1px solid #ffb3b3", padding: 10, borderRadius: 10, marginBottom: 12 }}>
+          <div
+            style={{
+              background: "#ffe5e5",
+              border: "1px solid #ffb3b3",
+              padding: 10,
+              borderRadius: 10,
+              marginBottom: 12,
+            }}
+          >
             {error}
           </div>
         )}

@@ -2,10 +2,14 @@
 
 const COOKIE_NAME = "gobii_admin_session";
 
+type LoginBody = {
+  token?: unknown;
+};
+
 export async function POST(request: Request) {
   try {
-    const body = await request.json().catch(() => ({} as any));
-    const token = (body?.token ?? "").toString().trim();
+    const body = (await request.json().catch(() => ({}))) as LoginBody;
+    const token = typeof body.token === "string" ? body.token.trim() : "";
 
     const adminToken = process.env.APP_ADMIN_TOKEN?.trim();
     if (!adminToken) {
@@ -33,9 +37,10 @@ export async function POST(request: Request) {
     });
 
     return res;
-  } catch (e: any) {
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "unknown";
     return NextResponse.json(
-      { success: false, error: "internal_error", message: e?.message ?? "unknown" },
+      { success: false, error: "internal_error", message },
       { status: 500 }
     );
   }
