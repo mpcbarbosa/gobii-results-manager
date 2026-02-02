@@ -1,3 +1,4 @@
+﻿import { requireAdminAuth } from "@/lib/adminAuth";
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
@@ -37,7 +38,12 @@ function escapeCsvField(value: unknown): string {
 }
 
 export async function GET(request: NextRequest) {
-  // Authenticate
+  
+  const auth = requireAdminAuth();
+  if (!auth.ok) {
+    return Response.json({ success: false, error: auth.error }, { status: auth.status });
+  }
+// Authenticate
   if (!authenticate(request)) {
     return NextResponse.json(
       { error: 'Unauthorized' },
@@ -238,3 +244,4 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
