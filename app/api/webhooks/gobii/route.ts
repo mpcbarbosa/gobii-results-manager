@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * Authenticate webhook request
@@ -157,11 +157,17 @@ export async function POST(request: NextRequest) {
     });
     
     // Forward to ingest endpoint internally
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 
-                    process.env.BASE_URL || 
-                    new URL(request.url).origin;
-    
-    const ingestToken = process.env.APP_INGEST_TOKEN;
+    const proto = request.headers.get("x-forwarded-proto") ?? "https";
+const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+if (!host) {
+  console.error("[Webhook] Missing host header");
+  return Response.json(
+    { success: false, error: "Internal configuration error", message: "Missing host header" },
+    { status: 500 }
+  );
+}
+const baseUrl = `${proto}://${host}`;
+const ingestToken = process.env.APP_INGEST_TOKEN;
     if (!ingestToken) {
       console.error('[Webhook] APP_INGEST_TOKEN not configured');
       return NextResponse.json(
@@ -220,3 +226,4 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
