@@ -1,9 +1,9 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-export default function AdminLoginPage() {
+function AdminLoginInner() {
   const searchParams = useSearchParams();
 
   const [token, setToken] = useState("");
@@ -96,5 +96,13 @@ export default function AdminLoginPage() {
         Sessão expira em 12h (configurável).
       </div>
     </div>
+  );
+}
+
+export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={<div style={{ maxWidth: 520, margin: "60px auto", padding: 24 }}>a carregar...</div>}>
+      <AdminLoginInner />
+    </Suspense>
   );
 }
