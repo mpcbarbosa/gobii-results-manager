@@ -1,16 +1,16 @@
 ﻿"use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 export default function AdminLoginPage() {
+  const searchParams = useSearchParams();
+
   const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const nextPath = useMemo(() => {
-    const url = new URL(window.location.href);
-    return url.searchParams.get("next") || "/admin/leads";
-  }, []);
+  const nextPath = searchParams.get("next") || "/admin/leads";
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
