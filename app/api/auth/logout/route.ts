@@ -9,7 +9,6 @@ export async function POST() {
     value: "",
     httpOnly: true,
     secure: true,
-    sameSite: "lax",
     path: "/",
     maxAge: 0,
   });

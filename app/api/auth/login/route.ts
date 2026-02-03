@@ -25,13 +25,12 @@ export async function POST(request: Request) {
 
     const res = NextResponse.json({ success: true });
 
-    // session cookie (simple: presence-based). For future: rotate to signed JWT.
+    // session cookie (presence-based). IMPORTANT: no sameSite to maximize client compatibility (e.g., PowerShell 5.1)
     res.cookies.set({
       name: COOKIE_NAME,
       value: "1",
       httpOnly: true,
       secure: true,
-      sameSite: "lax",
       path: "/",
       maxAge: 60 * 60 * 12, // 12h
     });
