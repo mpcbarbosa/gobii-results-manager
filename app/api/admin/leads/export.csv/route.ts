@@ -39,8 +39,9 @@ function escapeCsvField(value: unknown): string {
 
 export async function GET(request: NextRequest) {
   
-  const auth = requireAdminAuth();
-  if (!auth.ok) {
+  const req = arguments[0] as Request;
+  const auth = requireAdminAuth(req);
+if (!auth.ok) {
     return Response.json({ success: false, error: auth.error }, { status: auth.status });
   }
 // Authenticate
@@ -244,4 +245,5 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
 
