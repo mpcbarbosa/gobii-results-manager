@@ -37,7 +37,6 @@ interface SkippedResult {
 
 export async function POST(request: NextRequest) {
   
-  const req = arguments[0] as Request;
   const auth = requireAdminAuth(req);
 if (!auth.ok) {
     return Response.json({ success: false, error: auth.error }, { status: auth.status });
