@@ -25,7 +25,7 @@ function authenticate(request: NextRequest): boolean {
 
 export async function POST(request: NextRequest) {
   
-  const auth = requireAdminAuth(req);
+  const auth = requireAdminAuth(request);
 if (!auth.ok) {
     return Response.json({ success: false, error: auth.error }, { status: auth.status });
   }
