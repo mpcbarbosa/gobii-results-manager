@@ -1,3 +1,4 @@
+import { requireAdminAuth } from "@/lib/adminAuth";
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { LeadStatus } from '@prisma/client';
