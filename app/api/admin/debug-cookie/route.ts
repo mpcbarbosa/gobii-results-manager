@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const COOKIE_NAME = "gobii_admin_session";
