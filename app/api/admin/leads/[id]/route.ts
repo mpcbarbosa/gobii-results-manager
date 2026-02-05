@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { LeadStatus } from '@prisma/client';
 
 // Authentication middleware
-function authenticate(request: NextRequest): boolean {
+function authenticate(request: Request): boolean {
   const authHeader = request.headers.get('authorization');
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

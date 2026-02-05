@@ -4,7 +4,7 @@ import prisma from '@/lib/prisma';
 import { generateDomainSuggestion, meetsConfidenceThreshold, isInvalidDomain, type Mode } from '@/lib/utils/domain-suggestion';
 
 // Authentication middleware
-function authenticate(request: NextRequest): boolean {
+function authenticate(request: Request): boolean {
   const authHeader = request.headers.get('authorization');
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -22,7 +22,7 @@ function authenticate(request: NextRequest): boolean {
   return token === expectedToken;
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   
   const auth = requireAdminAuth(request);
 if (!auth.ok) {

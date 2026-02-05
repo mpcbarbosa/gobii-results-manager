@@ -3,7 +3,7 @@ import { requireAdminAuth } from "@/lib/adminAuth";
 import prisma from '@/lib/prisma';
 
 // Authentication middleware
-function authenticate(request: NextRequest): boolean {
+function authenticate(request: Request): boolean {
   const authHeader = request.headers.get('authorization');
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -37,7 +37,7 @@ interface SkippedResult {
   reason: string;
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   
   const auth = requireAdminAuth(request);
 if (!auth.ok) {

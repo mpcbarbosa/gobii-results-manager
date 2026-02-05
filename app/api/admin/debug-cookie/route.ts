@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 const COOKIE_NAME = "gobii_admin_session";
 
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
   const cookieHeader = req.headers.get("cookie") || "";
   const cookieApi = req.cookies.get(COOKIE_NAME)?.value || "";
   const ua = req.headers.get("user-agent") || "";

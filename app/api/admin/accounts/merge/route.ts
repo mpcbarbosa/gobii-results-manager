@@ -5,7 +5,7 @@ import { isInvalidDomain } from '@/lib/utils/domain-suggestion';
 import { Prisma } from '@prisma/client';
 
 // Authentication middleware
-function authenticate(request: NextRequest): boolean {
+function authenticate(request: Request): boolean {
   const authHeader = request.headers.get('authorization');
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -23,7 +23,7 @@ function authenticate(request: NextRequest): boolean {
   return token === expectedToken;
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   
   const auth = requireAdminAuth(request);
 if (!auth.ok) {
