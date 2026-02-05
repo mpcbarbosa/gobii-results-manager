@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/adminAuth";
-import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { generateDomainSuggestion, meetsConfidenceThreshold, isInvalidDomain } from '@/lib/utils/domain-suggestion';
 
