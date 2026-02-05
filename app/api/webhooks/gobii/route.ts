@@ -1,5 +1,4 @@
-import { NextResponse } from "next/server";
-
+import { NextRequest, NextResponse } from "next/server";
 /**
  * Authenticate webhook request
  * Accepts token from: Authorization Bearer, query string, or X-Gobii-Token header

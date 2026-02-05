@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-
 const COOKIE_NAME = "gobii_admin_session";
 
 export async function POST() {

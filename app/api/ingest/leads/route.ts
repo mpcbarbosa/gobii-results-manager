@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import prisma from '@/lib/prisma';
 import { ingestBatchSchema, type LeadInput } from '@/lib/validators/ingest';
 import { generateDedupeKey } from '@/lib/utils/dedupe';
