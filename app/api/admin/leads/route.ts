@@ -2,37 +2,11 @@ import { NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/adminAuth";
 import prisma from '@/lib/prisma';
 
-// Authentication middleware
-function authenticate(request: Request): boolean {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return false;
-  }
-  
-  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-  const expectedToken = process.env.APP_ADMIN_TOKEN;
-  
-  if (!expectedToken) {
-    console.error('APP_ADMIN_TOKEN not configured');
-    return false;
-  }
-  
-  return token === expectedToken;
-}
-
 export async function GET(request: Request) {
-  
+  // Authenticate (supports Bearer token and session cookie)
   const auth = requireAdminAuth(request);
-if (!auth.ok) {
+  if (!auth.ok) {
     return Response.json({ success: false, error: auth.error }, { status: auth.status });
-  }
-// Authenticate
-  if (!authenticate(request)) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    );
   }
   
   try {
