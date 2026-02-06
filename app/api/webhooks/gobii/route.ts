@@ -109,9 +109,25 @@ function normalizeGobiiPayload(body: Record<string, unknown>): { source: { key: 
     return null;
   }
   
+  // Attach raw data to each lead
+  const leadsWithRaw = leads.map((lead, index) => {
+    if (typeof lead === 'object' && lead !== null) {
+      const leadObj = lead as Record<string, unknown>;
+      return {
+        ...leadObj,
+        raw: {
+          gobii: body,
+          lead: lead,
+          index,
+        },
+      };
+    }
+    return lead;
+  });
+  
   return {
     source: { key: sourceKey },
-    leads,
+    leads: leadsWithRaw,
   };
 }
 
@@ -132,9 +148,18 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     // Log webhook received (without sensitive data)
+    const agentFields: Record<string, unknown> = {};
+    const agentKeys = ['agent_name', 'agent_id', 'agent', 'workflow', 'scanner', 'source_type'];
+    agentKeys.forEach(key => {
+      if (body[key] !== undefined) {
+        agentFields[key] = body[key];
+      }
+    });
+    
     console.log('[Webhook] Received:', {
       timestamp: new Date().toISOString(),
       bodyKeys: Object.keys(body),
+      agentFields,
       hasPayload: !!body.payload,
       hasLeads: !!body.leads,
     });

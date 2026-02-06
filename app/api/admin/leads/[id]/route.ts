@@ -21,6 +21,146 @@ function authenticate(request: Request): boolean {
   return token === expectedToken;
 }
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  // Authenticate
+  if (!authenticate(request)) {
+    return NextResponse.json(
+      { error: 'Unauthorized' },
+      { status: 401 }
+    );
+  }
+  
+  try {
+    const { id } = await params;
+    
+    // Fetch lead with all related data
+    const lead = await prisma.lead.findUnique({
+      where: { id },
+      include: {
+        source: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+          },
+        },
+        account: {
+          select: {
+            id: true,
+            name: true,
+            domain: true,
+            website: true,
+            country: true,
+            industry: true,
+            size: true,
+          },
+        },
+      },
+    });
+    
+    if (!lead) {
+      return NextResponse.json(
+        { error: 'Not found' },
+        { status: 404 }
+      );
+    }
+    
+    // Extract data from JSON fields
+    let summary: string | undefined;
+    let trigger: string | undefined;
+    let _externalId: string | undefined;
+    if (lead.enrichedData && typeof lead.enrichedData === 'object' && lead.enrichedData !== null) {
+      const enriched = lead.enrichedData as Record<string, unknown>;
+      summary = typeof enriched.summary === 'string' ? enriched.summary : undefined;
+      trigger = typeof enriched.trigger === 'string' ? enriched.trigger : undefined;
+      _externalId = typeof enriched.external_id === 'string' ? enriched.external_id : undefined;
+    }
+    
+    let probability: number | undefined;
+    let scoreTrigger: number | undefined;
+    let scoreProbability: number | undefined;
+    if (lead.scoreDetails && typeof lead.scoreDetails === 'object' && lead.scoreDetails !== null) {
+      const details = lead.scoreDetails as Record<string, unknown>;
+      probability = (typeof details.probability_value === 'number' ? details.probability_value : undefined) ||
+                    (typeof details.probability === 'number' ? details.probability : undefined);
+      scoreTrigger = typeof details.trigger === 'number' ? details.trigger : undefined;
+      scoreProbability = typeof details.probability === 'number' ? details.probability : undefined;
+    }
+    
+    // Extract contact from rawData if available
+    let contact: { name?: string; email?: string; phone?: string; role?: string } | null = null;
+    if (lead.rawData && typeof lead.rawData === 'object' && lead.rawData !== null) {
+      const raw = lead.rawData as Record<string, unknown>;
+      if (raw.contact && typeof raw.contact === 'object') {
+        const contactData = raw.contact as Record<string, unknown>;
+        contact = {
+          name: typeof contactData.name === 'string' ? contactData.name :
+                (typeof contactData.full_name === 'string' ? contactData.full_name : undefined),
+          email: typeof contactData.email === 'string' ? contactData.email : undefined,
+          phone: typeof contactData.phone === 'string' ? contactData.phone : undefined,
+          role: typeof contactData.role === 'string' ? contactData.role : undefined,
+        };
+      }
+    }
+    
+    return NextResponse.json({
+      success: true,
+      item: {
+        id: lead.id,
+        dedupeKey: lead.dedupeKey,
+        status: lead.status,
+        score: lead.score,
+        summary,
+        trigger,
+        probability,
+        score_trigger: scoreTrigger,
+        score_probability: scoreProbability,
+        score_final: lead.score,
+        notes: lead.notes,
+        owner: lead.owner,
+        nextActionAt: lead.nextActionAt,
+        seenCount: lead.seenCount,
+        lastSeenAt: lead.lastSeenAt,
+        createdAt: lead.createdAt,
+        updatedAt: lead.updatedAt,
+        deletedAt: lead.deletedAt,
+        rawData: lead.rawData,
+        enrichedData: lead.enrichedData,
+        scoreDetails: lead.scoreDetails,
+        source: {
+          id: lead.source.id,
+          name: lead.source.name,
+          type: lead.source.type,
+        },
+        account: {
+          id: lead.account.id,
+          name: lead.account.name,
+          domain: lead.account.domain,
+          website: lead.account.website,
+          country: lead.account.country,
+          industry: lead.account.industry,
+          size: lead.account.size,
+        },
+        contact,
+      },
+    });
+    
+  } catch (error) {
+    console.error('Get lead error:', error);
+    
+    return NextResponse.json(
+      {
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
+  }
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
