@@ -1,35 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from '@/lib/prisma';
 import { LeadStatus } from '@prisma/client';
-
-// Authentication middleware
-function authenticate(request: Request): boolean {
-  const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return false;
-  }
-  
-  const token = authHeader.substring(7); // Remove 'Bearer ' prefix
-  const expectedToken = process.env.APP_ADMIN_TOKEN;
-  
-  if (!expectedToken) {
-    console.error('APP_ADMIN_TOKEN not configured');
-    return false;
-  }
-  
-  return token === expectedToken;
-}
+import { requireAdminAuth } from "@/lib/adminAuth";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  // Authenticate
-  if (!authenticate(request)) {
+  // Authenticate (supports Bearer token and session cookie)
+  const auth = requireAdminAuth(request);
+  if (!auth.ok) {
+    console.log('[Admin Leads Detail] Auth failed:', {
+      status: auth.status,
+      error: auth.error,
+      hasCookie: !!request.cookies.get('gobii_admin_session'),
+      hasBearer: !!request.headers.get('authorization'),
+    });
     return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
+      { error: auth.error },
+      { status: auth.status }
     );
   }
   
@@ -165,11 +154,12 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  // Authenticate
-  if (!authenticate(request)) {
+  // Authenticate (supports Bearer token and session cookie)
+  const auth = requireAdminAuth(request);
+  if (!auth.ok) {
     return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
+      { error: auth.error },
+      { status: auth.status }
     );
   }
   
