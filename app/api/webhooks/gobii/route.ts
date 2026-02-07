@@ -74,12 +74,7 @@ function normalizeGobiiPayload(body: Record<string, unknown>): { source: { key: 
     sourceKey = body.agent_id;
   }
   
-  // Fallback
-  if (!sourceKey) {
-    sourceKey = 'gobii-webhook';
-  }
-  
-  // Determine leads array
+  // Determine leads array first (needed for priority 5)
   let leads: unknown[] | undefined;
   
   // Try body.leads
@@ -107,6 +102,36 @@ function normalizeGobiiPayload(body: Record<string, unknown>): { source: { key: 
   
   if (!leads || leads.length === 0) {
     return null;
+  }
+  
+  // Priority 5: Check first lead's source.key
+  if (!sourceKey || sourceKey === 'gobii-webhook') {
+    if (leads.length > 0 && typeof leads[0] === 'object' && leads[0] !== null) {
+      const firstLead = leads[0] as Record<string, unknown>;
+      if (firstLead.source && typeof firstLead.source === 'object') {
+        const leadSource = firstLead.source as Record<string, unknown>;
+        if (typeof leadSource.key === 'string') {
+          // Check if all leads have the same source
+          const allSameSource = leads.every(lead => {
+            if (typeof lead === 'object' && lead !== null) {
+              const l = lead as Record<string, unknown>;
+              if (l.source && typeof l.source === 'object') {
+                const s = l.source as Record<string, unknown>;
+                return s.key === leadSource.key;
+              }
+            }
+            return false;
+          });
+          
+          sourceKey = allSameSource ? leadSource.key : 'gobii-webhook-mixed';
+        }
+      }
+    }
+  }
+  
+  // Final fallback
+  if (!sourceKey) {
+    sourceKey = 'gobii-webhook';
   }
   
   // Attach raw data to each lead
