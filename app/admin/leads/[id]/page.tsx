@@ -38,31 +38,44 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     try {
       setLoading(true);
       setError(null);
-      // Fetch lead directly by ID
-      const response = await adminFetch<{ success: boolean; item: LeadItem }>(`/api/admin/leads/${leadId}`);
       
-      if (!response.success || !response.item) {
-        setError('Lead not found');
+      // Fetch lead directly by ID
+      const response = await adminFetch<{ success: boolean; item?: LeadItem }>(`/api/admin/leads/${leadId}`);
+      
+      // Validate response
+      if (!response || !response.success || !response.item) {
+        setError('Lead not found or unauthorized');
+        setLoading(false);
         return;
       }
       
       const foundLead = response.item;
+      
+      // Validate lead has required fields
+      if (!foundLead.id || !foundLead.account) {
+        setError('Invalid lead data');
+        setLoading(false);
+        return;
+      }
+      
       setLead(foundLead);
       setStatus(foundLead.notes || 'NEW');
       setNotes(foundLead.notes || '');
       setOwner(foundLead.owner || '');
       setNextActionAt(isoToDatetimeLocal(foundLead.nextActionAt));
     } catch (err) {
+      console.error('Load lead error:', err);
       if (err instanceof Error) {
         if (err.message.includes('404') || err.message.includes('Not found')) {
           setError('Lead not found');
-        } else if (err.message.includes('401') || err.message.includes('403')) {
-          setError('Unauthorized');
+        } else if (err.message.includes('401') || err.message.includes('403') || err.message.includes('Unauthorized')) {
+          setError('Unauthorized - please login again');
+          // Redirect handled by adminFetch
         } else {
-          setError(err.message);
+          setError(`Error: ${err.message}`);
         }
       } else {
-        setError('Failed to load lead');
+        setError('Unexpected error loading lead');
       }
     } finally {
       setLoading(false);
