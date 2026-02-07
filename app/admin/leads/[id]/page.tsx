@@ -149,8 +149,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             <div className="grid grid-cols-2 gap-4 mb-6">
               <div>
                 <label className="text-sm font-medium text-gray-500">Company</label>
-                <div className="text-lg font-semibold">{lead.company.name}</div>
-                <div className="text-sm text-gray-600">{lead.company.domain || '-'}</div>
+                <div className="text-lg font-semibold">{lead.account?.name ?? '-'}</div>
+                <div className="text-sm text-gray-600">{lead.account?.domain ?? '-'}</div>
               </div>
               
               <div>
