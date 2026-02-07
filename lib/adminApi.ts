@@ -23,20 +23,26 @@ export async function adminFetch<T>(
 ): Promise<T> {
   const token = getAdminToken();
   
-  if (!token) {
-    throw new Error('No admin token found');
-  }
-  
   const response = await fetch(url, {
     ...options,
+    credentials: 'include',  // Send cookies
+    cache: 'no-store',       // Avoid auth cache issues
     headers: {
       ...options.headers,
-      'Authorization': `Bearer ${token}`,
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       'Content-Type': 'application/json',
     },
   });
   
   if (!response.ok) {
+    // Handle 401/403 - redirect to login
+    if (response.status === 401 || response.status === 403) {
+      if (typeof window !== 'undefined') {
+        window.location.href = '/admin/login';
+      }
+      throw new Error('Unauthorized');
+    }
+    
     const error = await response.json().catch(() => ({ error: 'Unknown error' }));
     throw new Error(error.error || `HTTP ${response.status}`);
   }
