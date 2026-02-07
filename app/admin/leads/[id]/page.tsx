@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminTokenGate from '@/components/admin/AdminTokenGate';
-import { listLeads, patchLead, type LeadItem } from '@/lib/adminApi';
+import { adminFetch, patchLead, type LeadItem } from '@/lib/adminApi';
 import { formatDate, isoToDatetimeLocal, datetimeLocalToIso } from '@/lib/date';
 
 export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -38,22 +38,32 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
     try {
       setLoading(true);
       setError(null);
-      // Fetch lead by searching for its ID
-      const response = await listLeads({ q: leadId, take: 1 });
-      const foundLead = response.items.find(l => l.id === leadId);
+      // Fetch lead directly by ID
+      const response = await adminFetch<{ success: boolean; item: LeadItem }>(`/api/admin/leads/${leadId}`);
       
-      if (!foundLead) {
+      if (!response.success || !response.item) {
         setError('Lead not found');
         return;
       }
       
+      const foundLead = response.item;
       setLead(foundLead);
       setStatus(foundLead.notes || 'NEW');
       setNotes(foundLead.notes || '');
       setOwner(foundLead.owner || '');
       setNextActionAt(isoToDatetimeLocal(foundLead.nextActionAt));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load lead');
+      if (err instanceof Error) {
+        if (err.message.includes('404') || err.message.includes('Not found')) {
+          setError('Lead not found');
+        } else if (err.message.includes('401') || err.message.includes('403')) {
+          setError('Unauthorized');
+        } else {
+          setError(err.message);
+        }
+      } else {
+        setError('Failed to load lead');
+      }
     } finally {
       setLoading(false);
     }
