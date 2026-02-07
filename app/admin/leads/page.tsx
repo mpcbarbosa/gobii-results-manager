@@ -3,12 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminTokenGate from '@/components/admin/AdminTokenGate';
-import { listLeads, type LeadItem, type LeadFilters, getAdminToken } from '@/lib/adminApi';
+import { listLeads, adminFetch, type LeadItem, type LeadFilters, getAdminToken } from '@/lib/adminApi';
 import { formatDate } from '@/lib/date';
 
 export default function AdminLeadsPage() {
   const router = useRouter();
   const [leads, setLeads] = useState<LeadItem[]>([]);
+  const [sources, setSources] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [count, setCount] = useState(0);
@@ -21,8 +22,18 @@ export default function AdminLeadsPage() {
   });
   
   useEffect(() => {
+    loadSources();
     loadLeads();
   }, [filters]);
+  
+  const loadSources = async () => {
+    try {
+      const response = await adminFetch<{ success: boolean; items: Array<{ id: string; name: string }> }>('/api/admin/sources');
+      setSources(response.items);
+    } catch (err) {
+      console.error('Failed to load sources:', err);
+    }
+  };
   
   const loadLeads = async () => {
     try {
@@ -99,7 +110,7 @@ export default function AdminLeadsPage() {
           </div>
           
           {/* Filters */}
-          <div className="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-5 gap-4">
             <input
               type="text"
               placeholder="Search..."
@@ -119,6 +130,17 @@ export default function AdminLeadsPage() {
               <option value="QUALIFIED">QUALIFIED</option>
               <option value="DISQUALIFIED">DISQUALIFIED</option>
               <option value="CONTACTED">CONTACTED</option>
+            </select>
+            
+            <select
+              value={filters.source || ''}
+              onChange={(e) => setFilters(f => ({ ...f, source: e.target.value || undefined, skip: 0 }))}
+              className="px-3 py-2 border border-gray-300 rounded-md"
+            >
+              <option value="">All Sources</option>
+              {sources.map(source => (
+                <option key={source.id} value={source.name}>{source.name}</option>
+              ))}
             </select>
             
             <select
