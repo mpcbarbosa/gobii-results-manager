@@ -1,38 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 /**
  * Authenticate webhook request
- * Accepts token from: Authorization Bearer, query string, or X-Gobii-Token header
+ * Accepts token from: Authorization Bearer, X-Gobii-Token header, or query string
+ * Priority: GOBII_WEBHOOK_TOKEN > APP_INGEST_TOKEN
  */
 function authenticateWebhook(request: NextRequest): boolean {
   const webhookToken = process.env.GOBII_WEBHOOK_TOKEN;
   const ingestToken = process.env.APP_INGEST_TOKEN;
   
-  // If no webhook token configured, fall back to ingest token
-  const expectedToken = webhookToken || ingestToken;
-  
-  if (!expectedToken) {
+  if (!webhookToken && !ingestToken) {
     console.error('[Webhook] No GOBII_WEBHOOK_TOKEN or APP_INGEST_TOKEN configured');
     return false;
   }
   
-  // Try Authorization Bearer header
+  // Try Authorization Bearer header (priority 1)
   const authHeader = request.headers.get('authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.substring(7).trim();
-    if (token === expectedToken) return true;
+    // Check webhook token first, then ingest token
+    if (webhookToken && token === webhookToken) return true;
+    if (ingestToken && token === ingestToken) return true;
   }
   
-  // Try X-Gobii-Token header
+  // Try X-Gobii-Token header (priority 2)
   const gobiiHeader = request.headers.get('x-gobii-token');
-  if (gobiiHeader && gobiiHeader.trim() === expectedToken) {
-    return true;
+  if (gobiiHeader) {
+    const token = gobiiHeader.trim();
+    if (webhookToken && token === webhookToken) return true;
+    if (ingestToken && token === ingestToken) return true;
   }
   
-  // Try query string
+  // Try query string (priority 3)
   const { searchParams } = new URL(request.url);
   const queryToken = searchParams.get('token');
-  if (queryToken && queryToken.trim() === expectedToken) {
-    return true;
+  if (queryToken) {
+    const token = queryToken.trim();
+    if (webhookToken && token === webhookToken) return true;
+    if (ingestToken && token === ingestToken) return true;
   }
   
   return false;
@@ -156,6 +160,113 @@ function normalizeGobiiPayload(body: Record<string, unknown>): { source: { key: 
   };
 }
 
+/**
+ * Handle multi-agent payload format
+ */
+async function handleMultiAgentPayload(
+  request: NextRequest,
+  agents: unknown[],
+  startTime: number
+): Promise<NextResponse> {
+  const proto = request.headers.get("x-forwarded-proto") ?? "https";
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  
+  if (!host) {
+    console.error("[Webhook] Missing host header");
+    return NextResponse.json(
+      { success: false, error: "Internal configuration error" },
+      { status: 500 }
+    );
+  }
+  
+  const baseUrl = `${proto}://${host}`;
+  const ingestToken = process.env.APP_INGEST_TOKEN;
+  
+  if (!ingestToken) {
+    console.error('[Webhook] APP_INGEST_TOKEN not configured');
+    return NextResponse.json(
+      { success: false, error: 'Internal configuration error' },
+      { status: 500 }
+    );
+  }
+  
+  const results = {
+    totalCreated: 0,
+    totalUpdated: 0,
+    totalSkipped: 0,
+    byAgent: [] as Array<{
+      agentName: string;
+      created: number;
+      updated: number;
+      skipped: number;
+    }>,
+  };
+  
+  for (const agent of agents) {
+    if (typeof agent !== 'object' || agent === null) continue;
+    
+    const agentObj = agent as Record<string, unknown>;
+    const agentName = typeof agentObj.agent_name === 'string' ? agentObj.agent_name : 'unknown';
+    
+    try {
+      // Normalize agent payload
+      const normalized = normalizeGobiiPayload(agentObj);
+      
+      if (!normalized) {
+        console.warn(`[Webhook] No leads in agent ${agentName}`);
+        continue;
+      }
+      
+      // Forward to ingest
+      const ingestResponse = await fetch(`${baseUrl}/api/ingest/leads`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${ingestToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(normalized),
+      });
+      
+      const ingestResult = await ingestResponse.json();
+      
+      if (ingestResponse.ok && ingestResult.counts) {
+        results.totalCreated += ingestResult.counts.created || 0;
+        results.totalUpdated += ingestResult.counts.updated || 0;
+        results.totalSkipped += ingestResult.counts.skipped || 0;
+        
+        results.byAgent.push({
+          agentName,
+          created: ingestResult.counts.created || 0,
+          updated: ingestResult.counts.updated || 0,
+          skipped: ingestResult.counts.skipped || 0,
+        });
+      }
+    } catch (error) {
+      console.error(`[Webhook] Error processing agent ${agentName}:`, error);
+    }
+  }
+  
+  const duration = Date.now() - startTime;
+  
+  console.log('[Webhook] Multi-agent success:', {
+    agentCount: agents.length,
+    totalCreated: results.totalCreated,
+    totalUpdated: results.totalUpdated,
+    totalSkipped: results.totalSkipped,
+    duration: `${duration}ms`,
+  });
+  
+  return NextResponse.json({
+    success: true,
+    multiAgent: true,
+    agentCount: agents.length,
+    totalCreated: results.totalCreated,
+    totalUpdated: results.totalUpdated,
+    totalSkipped: results.totalSkipped,
+    byAgent: results.byAgent,
+  });
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
   
@@ -187,9 +298,15 @@ export async function POST(request: NextRequest) {
       agentFields,
       hasPayload: !!body.payload,
       hasLeads: !!body.leads,
+      hasAgents: !!body.agents,
     });
     
-    // Normalize payload
+    // Check for multi-agent format
+    if (body.agents && Array.isArray(body.agents)) {
+      return await handleMultiAgentPayload(request, body.agents, startTime);
+    }
+    
+    // Normalize single payload
     const normalized = normalizeGobiiPayload(body);
     
     if (!normalized) {
