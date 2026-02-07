@@ -81,7 +81,12 @@ export async function POST(request: NextRequest) {
         applied: 0,
         skipped: 0,
       },
-      debug: [] as Array<{ leadId: string; accountMatchedBy: string }>,
+      debug: [] as Array<{ 
+        leadId: string; 
+        accountMatchedBy: string;
+        domainAutofillAction: string;
+        domainAutofillReason: string;
+      }>,
     };
     
     for (const leadInput of leadsInput) {
@@ -94,7 +99,12 @@ export async function POST(request: NextRequest) {
         
         const result = await processLead(leadSource.key, source.id, leadInput);
         results.ids.push(result.leadId);
-        results.debug.push({ leadId: result.leadId, accountMatchedBy: result.accountMatchedBy });
+        results.debug.push({ 
+          leadId: result.leadId, 
+          accountMatchedBy: result.accountMatchedBy,
+          domainAutofillAction: result.domainAutofillAction,
+          domainAutofillReason: result.domainAutofillReason,
+        });
         if (result.isNew) {
           results.created++;
         } else {
@@ -144,6 +154,8 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
   domainAutofilled: boolean; 
   domainSkipped: boolean;
   accountMatchedBy: 'domain' | 'suggested_domain' | 'name' | 'created';
+  domainAutofillAction: 'applied' | 'skipped' | 'none';
+  domainAutofillReason: string;
 }> {
   // Normalize company name
   const companyNameNormalized = leadInput.company.name_normalized || 
@@ -221,6 +233,25 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
     }
   }
   
+  // Determine if we should update domain
+  let shouldUpdateDomain = false;
+  let domainUpdateReason = '';
+  
+  if (account) {
+    // Check if domain is locked
+    if (account.domainLocked) {
+      domainUpdateReason = 'locked';
+      domainSkipped = true;
+    } else if (account.domain === null || isInvalidDomain(account.domain)) {
+      // Only update if current is null or invalid
+      if (normalizedDomain) {
+        shouldUpdateDomain = true;
+        domainUpdateReason = 'autofilled';
+        domainAutofilled = true;
+      }
+    }
+  }
+  
   // Create or update account
   if (account) {
     // Update existing account
@@ -229,8 +260,8 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
       data: {
         name: leadInput.company.name,
         nameNormalized: companyNameNormalized,
-        // Only update domain if current is null or invalid
-        domain: (account.domain === null || isInvalidDomain(account.domain)) ? normalizedDomain : account.domain,
+        // Only update domain if not locked and (null or invalid)
+        domain: shouldUpdateDomain ? normalizedDomain : account.domain,
         website: leadInput.company.website || account.website,
         industry: leadInput.company.industry || account.industry,
         size: leadInput.company.size || account.size,
@@ -244,6 +275,7 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
         name: leadInput.company.name,
         nameNormalized: companyNameNormalized,
         domain: normalizedDomain,
+        domainLocked: false,
         website: leadInput.company.website,
         industry: leadInput.company.industry,
         size: leadInput.company.size,
@@ -251,6 +283,10 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
       },
     });
     accountMatchedBy = 'created';
+    if (normalizedDomain) {
+      domainAutofilled = true;
+      domainUpdateReason = 'autofilled';
+    }
   }
   
   // Upsert Contact if email provided
@@ -422,5 +458,15 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
     });
   }
   
-  return { leadId: lead.id, isNew, domainAutofilled, domainSkipped, accountMatchedBy };
+  const domainAutofillAction = domainAutofilled ? 'applied' : (domainSkipped ? 'skipped' : 'none');
+  
+  return { 
+    leadId: lead.id, 
+    isNew, 
+    domainAutofilled, 
+    domainSkipped, 
+    accountMatchedBy,
+    domainAutofillAction,
+    domainAutofillReason: domainUpdateReason || 'none',
+  };
 }

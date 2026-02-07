@@ -107,6 +107,7 @@ model Account {
   name              String    // Company name
   nameNormalized    String    @map("name_normalized") // Lowercase, trimmed for deduplication
   domain            String?   @unique // Primary domain (e.g., "example.com")
+  domainLocked      Boolean   @default(false) @map("domain_locked") // Prevent autofill if manually set
   website           String?
   industry          String?
   size              String?   // e.g., "1-10", "11-50", "51-200"

@@ -93,10 +93,13 @@ export async function POST(request: Request) {
           continue;
         }
         
-        // Update the account
+        // Update the account and lock domain
         await prisma.account.update({
           where: { id: update.accountId },
-          data: { domain: normalizedDomain },
+          data: { 
+            domain: normalizedDomain,
+            domainLocked: true,
+          },
         });
         
         updated.push({
