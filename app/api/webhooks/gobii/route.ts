@@ -310,11 +310,14 @@ export async function POST(request: NextRequest) {
     const normalized = normalizeGobiiPayload(body);
     
     if (!normalized) {
-      console.error('[Webhook] No leads found in payload');
-      return NextResponse.json(
-        { success: false, error: 'No leads found in payload' },
-        { status: 400 }
-      );
+      // Return success with zero counts (healthcheck/empty cycle)
+      console.log('[Webhook] No leads found in payload (empty cycle)');
+      return NextResponse.json({
+        success: true,
+        sourceKey: 'unknown',
+        counts: { created: 0, updated: 0, skipped: 0 },
+        domainAutofill: { applied: 0, skipped: 0 },
+      });
     }
     
     console.log('[Webhook] Normalized:', {
