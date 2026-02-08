@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import AdminTokenGate from '@/components/admin/AdminTokenGate';
 import { adminFetch, patchLead, type LeadItem } from '@/lib/adminApi';
 import { formatDate, isoToDatetimeLocal, datetimeLocalToIso } from '@/lib/date';
+import { formatProbability } from '@/lib/format';
 
 export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
@@ -170,7 +171,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               
               <div>
                 <label className="text-sm font-medium text-gray-500">Probability</label>
-                <div className="text-sm">{lead.probability ? (lead.probability * 100).toFixed(0) + '%' : '-'}</div>
+                <div className="text-sm">{formatProbability(lead.probability)}</div>
               </div>
               
               <div>
