@@ -81,9 +81,9 @@ if (!auth.ok) {
     // Filter accounts based on mode
     let filteredAccounts = accounts;
     if (mode === 'invalid') {
-      filteredAccounts = accounts.filter(a => isInvalidDomain(a.domain));
+      filteredAccounts = accounts.filter((a: { domain: string | null }) => isInvalidDomain(a.domain));
     } else if (mode === 'missing_or_invalid') {
-      filteredAccounts = accounts.filter(a => a.domain === null || isInvalidDomain(a.domain));
+      filteredAccounts = accounts.filter((a: { domain: string | null }) => a.domain === null || isInvalidDomain(a.domain));
     }
     
     // Limit to requested take after filtering
