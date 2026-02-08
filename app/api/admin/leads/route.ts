@@ -143,21 +143,72 @@ export async function GET(request: Request) {
       let _externalId: string | undefined;
       if (lead.enrichedData && typeof lead.enrichedData === 'object' && lead.enrichedData !== null) {
         const enriched = lead.enrichedData as Record<string, unknown>;
-        summary = typeof enriched.summary === 'string' ? enriched.summary : undefined;
-        trigger = typeof enriched.trigger === 'string' ? enriched.trigger : undefined;
+        summary = pickString(
+  enriched.summary,
+  getStr(getObj(lead.rawData), "summary"),
+  getStr(getObj(getObj(lead.rawData)?.enriched), "summary"),
+  getStr(getObj(getObj(lead.rawData)?.payload), "summary")
+);
+
+trigger = pickString(
+  enriched.trigger,
+  getStr(getObj(lead.rawData), "trigger"),
+  getStr(getObj(lead.rawData), "score_trigger"),
+  getStr(getObj(getObj(lead.rawData)?.score), "trigger")
+);
         _externalId = typeof enriched.external_id === 'string' ? enriched.external_id : undefined;
       }
       
-      // Extract data from scoreDetails
+      function pickString(...vals: unknown[]): string | undefined {
+  for (const v of vals) if (typeof v === "string" && v.trim() !== "") return v;
+  return undefined;
+}
+
+function pickNumber(...vals: unknown[]): number | undefined {
+  for (const v of vals) if (typeof v === "number" && !Number.isNaN(v)) return v;
+  return undefined;
+}
+
+function getObj(v: unknown): Record<string, unknown> | undefined {
+  return (v && typeof v === "object") ? (v as Record<string, unknown>) : undefined;
+}
+
+function getStr(o: Record<string, unknown> | undefined, key: string): string | undefined {
+  const v = o ? o[key] : undefined;
+  return typeof v === "string" && v.trim() !== "" ? v : undefined;
+}
+
+function getNum(o: Record<string, unknown> | undefined, key: string): number | undefined {
+  const v = o ? o[key] : undefined;
+  return typeof v === "number" && !Number.isNaN(v) ? v : undefined;
+}
+
+function normalizeProbabilityValue(raw: number | undefined): number | undefined {
+  if (raw === undefined) return undefined;
+  // accept 0..1, 0..100
+  const p = raw > 1 ? raw / 100 : raw;
+  return Math.max(0, Math.min(1, p));
+}
+
+// Extract data from scoreDetails
       let probability: number | undefined;
       let scoreTrigger: number | undefined;
       let scoreProbability: number | undefined;
       if (lead.scoreDetails && typeof lead.scoreDetails === 'object' && lead.scoreDetails !== null) {
         const details = lead.scoreDetails as Record<string, unknown>;
-        probability = (typeof details.probability_value === 'number' ? details.probability_value : undefined) || 
-                      (typeof details.probability === 'number' ? details.probability : undefined);
-        scoreTrigger = typeof details.trigger === 'number' ? details.trigger : undefined;
-        scoreProbability = typeof details.probability === 'number' ? details.probability : undefined;
+        const probValRaw = pickNumber(details.probability_value, details.probability);
+const probVal = normalizeProbabilityValue(probValRaw);
+
+probability = probVal;
+
+scoreTrigger = typeof details.trigger === "number" ? details.trigger : undefined;
+
+// Some sources use "probability" as score (0-20). If it looks like a score, keep it here.
+const probScoreCandidate = typeof details.probability === "number" ? details.probability : undefined;
+scoreProbability =
+  (probScoreCandidate !== undefined && probScoreCandidate > 1 && probScoreCandidate <= 20)
+    ? probScoreCandidate
+    : (getNum(details as Record<string, unknown>, "score_probability"));
       }
       
       // Extract contact from rawData if available

@@ -204,8 +204,8 @@ export default function AdminLeadsPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900">{lead.company.name}</div>
-                          <div className="text-sm text-gray-500">{lead.company.domain || '-'}</div>
+                          <div className="text-sm font-medium text-gray-900">{lead.company?.name ?? "-"}</div>
+                          <div className="text-sm text-gray-500">{lead.company?.domain ?? "-"}</div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900 max-w-md truncate">
