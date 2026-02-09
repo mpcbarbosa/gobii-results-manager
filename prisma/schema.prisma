@@ -31,15 +31,30 @@ enum UserRole {
 
 enum LeadStatus {
   NEW             // Initial state from source
-  REVIEWING       // Under review by operator
   QUALIFIED       // Meets qualification criteria
-  DISQUALIFIED    // Does not meet criteria
   CONTACTED       // Initial contact made
+  IN_PROGRESS     // Active work in progress
+  WON             // Successfully converted
+  LOST            // Lost opportunity
+  DISCARDED       // Discarded/not viable
+  
+  // Legacy statuses (kept for migration compatibility)
+  REVIEWING       // Under review by operator
+  DISQUALIFIED    // Does not meet criteria
   ENGAGED         // Active engagement
   NURTURING       // Long-term nurture
   READY_HANDOFF   // Ready for marketing/sales
   HANDED_OFF      // Transferred to next team
   ARCHIVED        // No longer active
+}
+
+enum ActivityType {
+  NOTE            // General note
+  CALL            // Phone call
+  EMAIL           // Email communication
+  MEETING         // Meeting (virtual or in-person)
+  TASK            // Task/action item
+  SYSTEM          // System-generated activity
 }
 
 enum InteractionChannel {
@@ -175,6 +190,10 @@ model Lead {
   owner             String?   // Owner/assignee for triage
   nextActionAt      DateTime? @map("next_action_at") // Next action date
   
+  // CRM fields
+  ownerId           String?   @map("owner_id") @db.Uuid // Assigned admin user
+  lastActivityAt    DateTime? @map("last_activity_at") // Last activity timestamp
+  
   // Hotness tracking
   seenCount         Int       @default(1) @map("seen_count") // Number of times lead appeared
   lastSeenAt        DateTime? @map("last_seen_at") // Last time lead was seen/updated
@@ -192,6 +211,8 @@ model Lead {
   scoringRuns       ScoringRun[]
   interactions      Interaction[]
   handoffs          Handoff[]
+  activities        Activity[]
+  ownerUser         User?     @relation("LeadOwner", fields: [ownerId], references: [id], onDelete: SetNull)
 
   @@index([sourceId])
   @@index([accountId])
@@ -252,6 +273,8 @@ model User {
   interactions      Interaction[]
   handoffsCreated   Handoff[] @relation("HandoffCreatedBy")
   handoffsAccepted  Handoff[] @relation("HandoffAcceptedBy")
+  activities        Activity[]
+  ownedLeads        Lead[] @relation("LeadOwner")
 
   @@index([email])
   @@index([role])
@@ -450,4 +473,35 @@ model Handoff {
   @@index([acceptedById])
   @@index([createdAt])
   @@map("handoffs")
+}
+
+// Activities: CRM activity log for leads
+model Activity {
+  id            String        @id @default(uuid()) @db.Uuid
+  
+  // Lead relationship
+  leadId        String        @map("lead_id") @db.Uuid
+  lead          Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  // Activity details
+  type          ActivityType
+  title         String
+  notes         String?       @db.Text
+  
+  // Created by
+  createdById   String        @map("created_by_id") @db.Uuid
+  createdBy     User          @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  
+  // Timestamps
+  createdAt     DateTime      @default(now()) @map("created_at")
+  dueAt         DateTime?     @map("due_at")
+  completedAt   DateTime?     @map("completed_at")
+  
+  @@index([leadId])
+  @@index([createdById])
+  @@index([type])
+  @@index([createdAt])
+  @@index([dueAt])
+  @@index([completedAt])
+  @@map("activities")
 }

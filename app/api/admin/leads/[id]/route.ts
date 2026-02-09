@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from '@/lib/prisma';
 import { LeadStatus } from '@prisma/client';
 import { requireAdminAuth } from "@/lib/adminAuth";
+import { deriveCommercialSignal, type ActivityInput } from "@/lib/crm/deriveCommercialSignal";
+import { deriveLeadTemperature } from "@/lib/crm/deriveLeadTemperature";
 
 export async function GET(
   request: NextRequest,
@@ -26,6 +28,10 @@ export async function GET(
     const { id } = await params;
     
     // Fetch lead with all related data
+    // 30-day window for SYSTEM activities used in signal derivation
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
     const lead = await prisma.lead.findUnique({
       where: { id },
       include: {
@@ -45,6 +51,20 @@ export async function GET(
             country: true,
             industry: true,
             size: true,
+          },
+        },
+        activities: {
+          where: {
+            type: "SYSTEM",
+            createdAt: { gte: thirtyDaysAgo },
+          },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            type: true,
+            title: true,
+            notes: true,
+            createdAt: true,
           },
         },
       },
@@ -95,6 +115,17 @@ export async function GET(
       }
     }
     
+    // Derive commercial signal from SYSTEM activities
+    const systemActivities: ActivityInput[] = lead.activities.map((a) => ({
+      id: a.id,
+      type: a.type,
+      title: a.title,
+      notes: a.notes,
+      createdAt: a.createdAt,
+    }));
+    const signal = deriveCommercialSignal(systemActivities);
+    const temperature = deriveLeadTemperature(signal.signalLevel);
+
     return NextResponse.json({
       success: true,
       item: {
@@ -134,6 +165,13 @@ export async function GET(
           size: lead.account.size,
         },
         contact,
+        commercialSignal: {
+          signalLevel: signal.signalLevel,
+          temperature,
+          reasons: signal.reasons,
+          lastSignalAt: signal.lastSignalAt,
+          lastSignalCategory: signal.lastSignalCategory,
+        },
       },
     });
     

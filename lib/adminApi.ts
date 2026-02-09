@@ -55,6 +55,7 @@ export interface LeadItem {
   id: string;
   createdAt: string;
   updatedAt: string;
+  status: string;
   summary?: string;
   trigger?: string;
   probability?: number;
@@ -68,6 +69,7 @@ export interface LeadItem {
   nextActionAt?: string;
   seenCount: number;
   lastSeenAt?: string;
+  lastActivityAt?: string;
   company: {
     name: string;
     domain?: string;
@@ -134,6 +136,86 @@ export async function patchLead(id: string, body: PatchLeadBody): Promise<PatchL
     method: 'PATCH',
     body: JSON.stringify(body),
   });
+}
+
+// --- Work Queue ---
+
+export interface WorkQueueItem {
+  id: string;
+  company: string;
+  domain: string | null;
+  source: string;
+  status: string;
+  score_final: number | null;
+  signalLevel: "HIGH" | "MEDIUM" | "LOW";
+  temperature: "HOT" | "WARM" | "COLD";
+  reasons: string[];
+  lastSignalAt: string | null;
+  lastSignalCategory: string | null;
+  lastActivityAt: string | null;
+}
+
+export interface WorkQueueResponse {
+  success: boolean;
+  count: number;
+  items: WorkQueueItem[];
+}
+
+export async function fetchWorkQueue(): Promise<WorkQueueResponse> {
+  return adminFetch<WorkQueueResponse>("/api/admin/leads/work-queue");
+}
+
+// --- Status change ---
+
+export interface StatusChangeResponse {
+  lead: {
+    id: string;
+    status: string;
+  };
+}
+
+export async function changeLeadStatus(
+  id: string,
+  status: string,
+  reason?: string,
+): Promise<StatusChangeResponse> {
+  return adminFetch<StatusChangeResponse>(`/api/admin/leads/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status, reason }),
+  });
+}
+
+// --- Create activity ---
+
+export interface CreateActivityPayload {
+  type: string;
+  title: string;
+  notes?: string;
+  dueAt?: string;
+}
+
+export interface CreateActivityResponse {
+  activity: {
+    id: string;
+    type: string;
+    title: string;
+    notes: string | null;
+    createdAt: string;
+  };
+  statusChanged: boolean;
+}
+
+export async function createActivity(
+  leadId: string,
+  payload: CreateActivityPayload,
+): Promise<CreateActivityResponse> {
+  return adminFetch<CreateActivityResponse>(
+    `/api/admin/leads/${leadId}/activities`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
 }
 
 export function buildExportUrl(filters: LeadFilters = {}): string {
