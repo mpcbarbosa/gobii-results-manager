@@ -8,6 +8,8 @@
  * @module lib/crm/deriveCommercialSignal
  */
 
+import { parseSystemMeta, sanitizeSourceUrl } from "./parseSystemMeta";
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -15,7 +17,7 @@
 /** Minimal Activity shape required by this helper (avoids coupling to Prisma) */
 export interface ActivityInput {
   id: string;
-  type: string;        // "SYSTEM" | "NOTE" | …
+  type: string; // "SYSTEM" | "NOTE" | …
   title: string;
   notes: string | null;
   createdAt: Date;
@@ -28,62 +30,16 @@ export interface CommercialSignal {
   reasons: string[];
   lastSignalAt: Date | null;
   lastSignalCategory: string | null;
+  /** Agent name from the most recent SYSTEM activity that produced lastSignalAt */
+  lastSignalAgent: string | null;
+  /** Sanitized source URL (http/https only) from the most recent signal */
+  lastSignalSourceUrl: string | null;
+  /** Confidence level from the most recent signal */
+  lastSignalConfidence: string | null;
 }
 
-// ---------------------------------------------------------------------------
-// Meta extraction from notes (SYSTEM activities store meta as formatted text)
-// ---------------------------------------------------------------------------
-
-interface ParsedMeta {
-  agent: string | null;
-  category: string | null;
-  confidence: string | null;
-  sourceUrl: string | null;
-  detectedAt: string | null;
-}
-
-/**
- * Parse meta fields embedded in the notes of a SYSTEM activity.
- *
- * The ingest endpoint formats meta as:
- * ```
- * ---
- * Agent: SAP_S4HANA_RFPScanner_Daily
- * Category: RFP
- * Confidence: HIGH
- * Source: https://…
- * Detected: 2026-02-09
- * ```
- */
-export function parseActivityMeta(notes: string | null): ParsedMeta {
-  const meta: ParsedMeta = {
-    agent: null,
-    category: null,
-    confidence: null,
-    sourceUrl: null,
-    detectedAt: null,
-  };
-
-  if (!notes) return meta;
-
-  const lines = notes.split("\n");
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("Agent:")) {
-      meta.agent = trimmed.slice("Agent:".length).trim() || null;
-    } else if (trimmed.startsWith("Category:")) {
-      meta.category = trimmed.slice("Category:".length).trim().toUpperCase() || null;
-    } else if (trimmed.startsWith("Confidence:")) {
-      meta.confidence = trimmed.slice("Confidence:".length).trim().toUpperCase() || null;
-    } else if (trimmed.startsWith("Source:")) {
-      meta.sourceUrl = trimmed.slice("Source:".length).trim() || null;
-    } else if (trimmed.startsWith("Detected:")) {
-      meta.detectedAt = trimmed.slice("Detected:".length).trim() || null;
-    }
-  }
-
-  return meta;
-}
+// Re-export parseActivityMeta for backward compatibility
+export { parseSystemMeta as parseActivityMeta } from "./parseSystemMeta";
 
 // ---------------------------------------------------------------------------
 // Signal classification rules
@@ -130,24 +86,31 @@ export function deriveCommercialSignal(
       reasons: ["No system signals detected"],
       lastSignalAt: null,
       lastSignalCategory: null,
+      lastSignalAgent: null,
+      lastSignalSourceUrl: null,
+      lastSignalConfidence: null,
     };
   }
 
   // Sort by createdAt descending (most recent first)
   const sorted = [...systemActivities].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    (a, b) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
 
   // Parse meta for each activity
   const parsed = sorted.map((a) => ({
     activity: a,
-    meta: parseActivityMeta(a.notes),
+    meta: parseSystemMeta(a.notes),
   }));
 
   // Determine the most recent signal metadata
   const latestMeta = parsed[0].meta;
   const lastSignalAt = sorted[0].createdAt;
   const lastSignalCategory = latestMeta.category;
+  const lastSignalAgent = latestMeta.agent;
+  const lastSignalSourceUrl = sanitizeSourceUrl(latestMeta.sourceUrl);
+  const lastSignalConfidence = latestMeta.confidence;
 
   // Collect reasons
   const reasons: string[] = [];
@@ -163,7 +126,9 @@ export function deriveCommercialSignal(
 
   if (highCategoryHits.length > 0) {
     signalLevel = "HIGH";
-    const categories = [...new Set(highCategoryHits.map((h) => h.meta.category!))];
+    const categories = [
+      ...new Set(highCategoryHits.map((h) => h.meta.category!)),
+    ];
     for (const cat of categories) {
       reasons.push(`${cat} detected`);
     }
@@ -210,8 +175,10 @@ export function deriveCommercialSignal(
       reasons.push(
         `${recentCount} system signals in the last ${RECENT_WINDOW_DAYS} days`,
       );
-    } else if (recentCount >= RECENT_BURST_THRESHOLD && signalLevel === "MEDIUM") {
-      // Already MEDIUM from category — add burst as additional reason
+    } else if (
+      recentCount >= RECENT_BURST_THRESHOLD &&
+      signalLevel === "MEDIUM"
+    ) {
       reasons.push(
         `${recentCount} system signals in the last ${RECENT_WINDOW_DAYS} days`,
       );
@@ -228,5 +195,8 @@ export function deriveCommercialSignal(
     reasons,
     lastSignalAt,
     lastSignalCategory,
+    lastSignalAgent,
+    lastSignalSourceUrl,
+    lastSignalConfidence,
   };
 }

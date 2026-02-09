@@ -116,6 +116,9 @@ export async function GET(request: Request) {
         reasons: signal.reasons,
         lastSignalAt: signal.lastSignalAt,
         lastSignalCategory: signal.lastSignalCategory,
+        lastSignalAgent: signal.lastSignalAgent,
+        lastSignalSourceUrl: signal.lastSignalSourceUrl,
+        lastSignalConfidence: signal.lastSignalConfidence,
         lastActivityAt: lead.lastActivityAt,
       };
     });

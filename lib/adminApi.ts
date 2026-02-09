@@ -152,6 +152,9 @@ export interface WorkQueueItem {
   reasons: string[];
   lastSignalAt: string | null;
   lastSignalCategory: string | null;
+  lastSignalAgent: string | null;
+  lastSignalSourceUrl: string | null;
+  lastSignalConfidence: string | null;
   lastActivityAt: string | null;
 }
 

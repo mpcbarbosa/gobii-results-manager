@@ -6,6 +6,7 @@ import AdminTokenGate from '@/components/admin/AdminTokenGate';
 import { adminFetch, type LeadItem } from '@/lib/adminApi';
 import { formatDate } from '@/lib/date';
 import { formatProbability } from '@/lib/format';
+import { parseSystemMeta, sanitizeSourceUrl } from '@/lib/crm/parseSystemMeta';
 
 // Activity types
 const ACTIVITY_TYPES = ['NOTE', 'CALL', 'EMAIL', 'MEETING', 'TASK'] as const;
@@ -313,28 +314,98 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   <p className="text-gray-500 text-sm">No activities yet. Create one below to get started.</p>
                 ) : (
                   <div className="space-y-4">
-                    {activities.map((activity) => (
-                      <div key={activity.id} className="border-l-4 border-blue-500 pl-4 py-2">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="inline-block px-2 py-1 text-xs font-semibold rounded bg-blue-100 text-blue-800">
-                                {activity.type}
-                              </span>
-                              <span className="font-semibold">{activity.title}</span>
-                            </div>
-                            {activity.notes && (
-                              <p className="text-sm text-gray-600 mt-1">{activity.notes}</p>
-                            )}
-                            <div className="text-xs text-gray-500 mt-1">
-                              {activity.createdBy.name} • {formatDate(activity.createdAt)}
-                              {activity.dueAt && ` • Due: ${formatDate(activity.dueAt)}`}
-                              {activity.completedAt && ` • Completed: ${formatDate(activity.completedAt)}`}
+                    {activities.map((activity) => {
+                      const isSystem = activity.type === 'SYSTEM';
+                      const meta = isSystem ? parseSystemMeta(activity.notes) : null;
+                      const safeUrl = meta ? sanitizeSourceUrl(meta.sourceUrl) : null;
+                      // Extract the user-facing notes (before the --- meta block)
+                      const userNotes = isSystem && activity.notes
+                        ? activity.notes.split('\n---\n')[0].trim()
+                        : activity.notes;
+
+                      return (
+                        <div
+                          key={activity.id}
+                          className={`border-l-4 pl-4 py-2 ${isSystem ? 'border-purple-500' : 'border-blue-500'}`}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className={`inline-block px-2 py-1 text-xs font-semibold rounded ${
+                                  isSystem ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                                }`}>
+                                  {activity.type}
+                                </span>
+                                <span className="font-semibold">{activity.title}</span>
+                              </div>
+
+                              {/* SYSTEM meta block */}
+                              {isSystem && meta && (meta.agent || meta.category || meta.confidence) && (
+                                <div className="mt-2 bg-purple-50 border border-purple-200 rounded-md p-3 text-sm space-y-1">
+                                  {meta.agent && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-purple-600 font-medium">Agent:</span>
+                                      <span className="text-gray-800">{meta.agent}</span>
+                                    </div>
+                                  )}
+                                  {meta.category && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-purple-600 font-medium">Category:</span>
+                                      <span className="inline-block px-2 py-0.5 rounded bg-purple-100 text-purple-800 text-xs font-semibold">
+                                        {meta.category}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {meta.confidence && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-purple-600 font-medium">Confidence:</span>
+                                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
+                                        meta.confidence === 'HIGH' ? 'bg-red-100 text-red-700' :
+                                        meta.confidence === 'MEDIUM' ? 'bg-amber-100 text-amber-700' :
+                                        'bg-gray-100 text-gray-700'
+                                      }`}>
+                                        {meta.confidence}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {meta.detectedAt && (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-purple-600 font-medium">Detected:</span>
+                                      <span className="text-gray-800">{meta.detectedAt}</span>
+                                    </div>
+                                  )}
+                                  {safeUrl && (
+                                    <div className="flex items-center gap-2">
+                                      <a
+                                        href={safeUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 text-xs font-medium"
+                                      >
+                                        🔗 Open source
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* User-facing notes (collapsed for SYSTEM) */}
+                              {userNotes && (
+                                <p className={`text-sm text-gray-600 mt-1 ${isSystem ? 'text-xs' : ''}`}>
+                                  {userNotes}
+                                </p>
+                              )}
+
+                              <div className="text-xs text-gray-500 mt-1">
+                                {activity.createdBy.name} • {formatDate(activity.createdAt)}
+                                {activity.dueAt && ` • Due: ${formatDate(activity.dueAt)}`}
+                                {activity.completedAt && ` • Completed: ${formatDate(activity.completedAt)}`}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

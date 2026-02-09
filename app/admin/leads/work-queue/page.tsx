@@ -114,6 +114,57 @@ function LastSignalCell({
   );
 }
 
+const CONFIDENCE_COLORS: Record<string, string> = {
+  HIGH: 'bg-red-50 text-red-700',
+  MEDIUM: 'bg-amber-50 text-amber-700',
+  LOW: 'bg-gray-50 text-gray-600',
+};
+
+/** Truncate agent name smartly: keep first 20 chars + ellipsis */
+function truncateAgent(agent: string | null): string {
+  if (!agent) return '-';
+  return agent.length > 22 ? agent.slice(0, 20) + '…' : agent;
+}
+
+function SignalProofCell({ item }: { item: WorkQueueItem }) {
+  const hasProof = item.lastSignalAgent || item.lastSignalCategory || item.lastSignalConfidence;
+  if (!hasProof && !item.lastSignalAt) return <span className="text-gray-400">-</span>;
+
+  return (
+    <div className="text-xs space-y-0.5">
+      {item.lastSignalAgent && (
+        <div className="text-gray-700" title={item.lastSignalAgent}>
+          🤖 {truncateAgent(item.lastSignalAgent)}
+        </div>
+      )}
+      <div className="flex items-center gap-1 flex-wrap">
+        {item.lastSignalCategory && (
+          <span className="inline-block px-1.5 py-0.5 rounded bg-gray-100 text-gray-700 font-medium">
+            {item.lastSignalCategory}
+          </span>
+        )}
+        {item.lastSignalConfidence && (
+          <span className={`inline-block px-1.5 py-0.5 rounded font-medium ${CONFIDENCE_COLORS[item.lastSignalConfidence] ?? 'bg-gray-50 text-gray-600'}`}>
+            {item.lastSignalConfidence}
+          </span>
+        )}
+        {item.lastSignalSourceUrl && (
+          <a
+            href={item.lastSignalSourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center text-blue-600 hover:text-blue-800"
+            title="Open source"
+            onClick={(e) => e.stopPropagation()}
+          >
+            🔗
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Skeleton rows for loading state
 function SkeletonRows({ count }: { count: number }) {
   return (
@@ -128,6 +179,7 @@ function SkeletonRows({ count }: { count: number }) {
           </td>
           <td className="px-4 py-3"><div className="h-5 w-16 bg-gray-200 rounded" /></td>
           <td className="px-4 py-3"><div className="h-4 w-40 bg-gray-200 rounded" /></td>
+          <td className="px-4 py-3"><div className="h-4 w-28 bg-gray-200 rounded" /></td>
           <td className="px-4 py-3"><div className="h-4 w-20 bg-gray-200 rounded" /></td>
           <td className="px-4 py-3"><div className="h-5 w-12 bg-gray-200 rounded" /></td>
           <td className="px-4 py-3"><div className="h-5 w-20 bg-gray-200 rounded" /></td>
@@ -558,6 +610,7 @@ export default function WorkQueuePage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reasons</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Signal Proof</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Signal</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Score</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -570,7 +623,7 @@ export default function WorkQueuePage() {
                   <SkeletonRows count={8} />
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-12 text-center text-gray-500">
+                    <td colSpan={11} className="px-4 py-12 text-center text-gray-500">
                       {items.length === 0
                         ? 'No leads in the work queue. All leads may be in terminal status or none exist.'
                         : 'No leads match the current filters.'}
@@ -605,6 +658,11 @@ export default function WorkQueuePage() {
                       {/* Reasons */}
                       <td className="px-4 py-3 max-w-xs">
                         <ReasonsCell reasons={item.reasons} />
+                      </td>
+
+                      {/* Signal Proof */}
+                      <td className="px-4 py-3">
+                        <SignalProofCell item={item} />
                       </td>
 
                       {/* Last Signal */}

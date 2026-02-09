@@ -171,6 +171,9 @@ export async function GET(
           reasons: signal.reasons,
           lastSignalAt: signal.lastSignalAt,
           lastSignalCategory: signal.lastSignalCategory,
+          lastSignalAgent: signal.lastSignalAgent,
+          lastSignalSourceUrl: signal.lastSignalSourceUrl,
+          lastSignalConfidence: signal.lastSignalConfidence,
         },
       },
     });
