@@ -469,6 +469,12 @@ export default function WorkQueuePage() {
             </div>
             <div className="flex items-center gap-3">
               <button
+                onClick={() => router.push('/admin/leads/my-queue')}
+                className="px-4 py-2 text-sm border border-purple-300 text-purple-700 rounded-md hover:bg-purple-50"
+              >
+                My Queue
+              </button>
+              <button
                 onClick={() => router.push('/admin/leads')}
                 className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
               >
@@ -614,7 +620,8 @@ export default function WorkQueuePage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Signal</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Score</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Activity</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">SLA</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Owner</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
@@ -623,7 +630,7 @@ export default function WorkQueuePage() {
                   <SkeletonRows count={8} />
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={11} className="px-4 py-12 text-center text-gray-500">
+                    <td colSpan={12} className="px-4 py-12 text-center text-gray-500">
                       {items.length === 0
                         ? 'No leads in the work queue. All leads may be in terminal status or none exist.'
                         : 'No leads match the current filters.'}
@@ -700,9 +707,20 @@ export default function WorkQueuePage() {
                         )}
                       </td>
 
-                      {/* Last Activity */}
-                      <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
-                        {formatDate(item.lastActivityAt)}
+                      {/* SLA */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full border ${
+                          item.sla.status === 'OVERDUE' ? 'bg-red-100 text-red-800 border-red-200' :
+                          item.sla.status === 'WARNING' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                          'bg-green-100 text-green-800 border-green-200'
+                        }`}>
+                          {item.sla.status === 'OVERDUE' ? '🔴' : item.sla.status === 'WARNING' ? '🟡' : '🟢'} {item.sla.label}
+                        </span>
+                      </td>
+
+                      {/* Owner */}
+                      <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-600">
+                        {item.ownerName ?? <span className="text-gray-400">—</span>}
                       </td>
 
                       {/* Actions */}

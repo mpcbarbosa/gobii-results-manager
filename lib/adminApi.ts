@@ -147,6 +147,8 @@ export interface WorkQueueItem {
   source: string;
   status: string;
   score_final: number | null;
+  ownerId: string | null;
+  ownerName: string | null;
   signalLevel: "HIGH" | "MEDIUM" | "LOW";
   temperature: "HOT" | "WARM" | "COLD";
   reasons: string[];
@@ -156,6 +158,12 @@ export interface WorkQueueItem {
   lastSignalSourceUrl: string | null;
   lastSignalConfidence: string | null;
   lastActivityAt: string | null;
+  lastHumanActivityAt: string | null;
+  sla: {
+    status: "OK" | "WARNING" | "OVERDUE";
+    label: string;
+    hoursElapsed: number;
+  };
 }
 
 export interface WorkQueueResponse {
@@ -164,8 +172,92 @@ export interface WorkQueueResponse {
   items: WorkQueueItem[];
 }
 
-export async function fetchWorkQueue(): Promise<WorkQueueResponse> {
-  return adminFetch<WorkQueueResponse>("/api/admin/leads/work-queue");
+export async function fetchWorkQueue(params?: {
+  ownerId?: string;
+  sort?: "temperature" | "sla";
+}): Promise<WorkQueueResponse> {
+  const qs = new URLSearchParams();
+  if (params?.ownerId) qs.set("ownerId", params.ownerId);
+  if (params?.sort) qs.set("sort", params.sort);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return adminFetch<WorkQueueResponse>(`/api/admin/leads/work-queue${suffix}`);
+}
+
+// --- Owner assignment ---
+
+export interface AssignOwnerResponse {
+  success: boolean;
+  lead: {
+    id: string;
+    ownerId: string | null;
+    owner: { id: string; name: string; email: string } | null;
+  };
+}
+
+export async function assignLeadOwner(
+  leadId: string,
+  ownerId: string | null,
+): Promise<AssignOwnerResponse> {
+  return adminFetch<AssignOwnerResponse>(
+    `/api/admin/leads/${leadId}/owner`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ ownerId }),
+    },
+  );
+}
+
+// --- Tasks ---
+
+export interface TaskItem {
+  id: string;
+  title: string;
+  notes: string | null;
+  dueAt: string | null;
+  createdAt: string;
+  createdBy: { id: string; name: string; email: string };
+  isOverdue: boolean;
+}
+
+export interface TasksResponse {
+  success: boolean;
+  tasks: TaskItem[];
+}
+
+export async function fetchOpenTasks(leadId: string): Promise<TasksResponse> {
+  return adminFetch<TasksResponse>(`/api/admin/leads/${leadId}/tasks`);
+}
+
+export async function completeTask(
+  leadId: string,
+  taskId: string,
+): Promise<CreateActivityResponse> {
+  return adminFetch<CreateActivityResponse>(
+    `/api/admin/leads/${leadId}/activities`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        type: "SYSTEM",
+        title: "Task completed",
+        notes: `Completed task ${taskId}`,
+      }),
+    },
+  );
+}
+
+// --- Users list (for owner assignment) ---
+
+export interface UserItem {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+export async function fetchUsers(): Promise<{ items: UserItem[] }> {
+  // Reuse admin sources pattern — we'll call a simple endpoint
+  // For now, we'll use a direct query approach
+  return adminFetch<{ items: UserItem[] }>("/api/admin/users");
 }
 
 // --- Status change ---

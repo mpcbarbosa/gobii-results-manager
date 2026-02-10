@@ -150,12 +150,19 @@ export async function POST(
       });
 
       // Update lead's lastActivityAt and potentially status
+      const now = new Date();
       const updateData: {
         lastActivityAt: Date;
+        lastHumanActivityAt?: Date;
         status?: LeadStatus;
       } = {
-        lastActivityAt: new Date(),
+        lastActivityAt: now,
       };
+
+      // Track human activity separately (non-SYSTEM)
+      if (type !== 'SYSTEM') {
+        updateData.lastHumanActivityAt = now;
+      }
 
       if (shouldAutoContact) {
         updateData.status = 'CONTACTED' as LeadStatus;

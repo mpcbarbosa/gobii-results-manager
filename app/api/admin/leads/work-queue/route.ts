@@ -7,39 +7,24 @@ import {
   type ActivityInput,
 } from "@/lib/crm/deriveCommercialSignal";
 import { deriveLeadTemperature } from "@/lib/crm/deriveLeadTemperature";
+import { deriveHumanSLA } from "@/lib/crm/deriveHumanSLA";
 
-/**
- * Terminal statuses excluded from the work queue.
- * Leads in these statuses are considered "done" and should not appear.
- */
 const TERMINAL_STATUSES: LeadStatus[] = [
   LeadStatus.WON,
   LeadStatus.LOST,
   LeadStatus.DISCARDED,
 ];
 
-/** Temperature sort priority (lower = higher priority) */
-const TEMP_ORDER: Record<string, number> = {
-  HOT: 0,
-  WARM: 1,
-  COLD: 2,
-};
+const TEMP_ORDER: Record<string, number> = { HOT: 0, WARM: 1, COLD: 2 };
+const SLA_ORDER: Record<string, number> = { OVERDUE: 0, WARNING: 1, OK: 2 };
 
 /**
  * GET /api/admin/leads/work-queue
  *
- * Returns a prioritised list of non-terminal leads enriched with
- * derived commercial signal and temperature.
- *
- * Ordering:
- *   1. temperature  — HOT → WARM → COLD
- *   2. lastSignalAt — most recent first
- *   3. score_final  — descending
- *
- * Authentication: requireAdminAuth (Bearer token or session cookie)
+ * Prioritised list of non-terminal leads with signal, temperature, and SLA.
+ * Optional query param: ?ownerId=<uuid> to filter by owner (used by my-queue).
  */
 export async function GET(request: Request) {
-  // --- Auth ---
   const auth = requireAdminAuth(request);
   if (!auth.ok) {
     return NextResponse.json(
@@ -49,30 +34,33 @@ export async function GET(request: Request) {
   }
 
   try {
-    // 30 days ago — window for SYSTEM activities
+    const { searchParams } = new URL(request.url);
+    const ownerIdFilter = searchParams.get("ownerId") || undefined;
+    const sortMode = searchParams.get("sort") || "temperature"; // "temperature" | "sla"
+
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // Fetch non-terminal leads with their SYSTEM activities (last 30 days)
+    const where: Record<string, unknown> = {
+      deletedAt: null,
+      status: { notIn: TERMINAL_STATUSES },
+    };
+
+    if (ownerIdFilter) {
+      where.ownerId = ownerIdFilter;
+    }
+
     const leads = await prisma.lead.findMany({
-      where: {
-        deletedAt: null,
-        status: {
-          notIn: TERMINAL_STATUSES,
-        },
-      },
+      where,
       include: {
         account: {
-          select: {
-            id: true,
-            name: true,
-            domain: true,
-          },
+          select: { id: true, name: true, domain: true },
         },
         source: {
-          select: {
-            name: true,
-          },
+          select: { name: true },
+        },
+        ownerUser: {
+          select: { id: true, name: true, email: true },
         },
         activities: {
           where: {
@@ -91,7 +79,6 @@ export async function GET(request: Request) {
       },
     });
 
-    // Enrich each lead with derived signal + temperature
     const enriched = leads.map((lead) => {
       const systemActivities: ActivityInput[] = lead.activities.map((a) => ({
         id: a.id,
@@ -103,6 +90,10 @@ export async function GET(request: Request) {
 
       const signal = deriveCommercialSignal(systemActivities);
       const temperature = deriveLeadTemperature(signal.signalLevel);
+      const sla = deriveHumanSLA(
+        lead.lastHumanActivityAt,
+        lead.createdAt,
+      );
 
       return {
         id: lead.id,
@@ -111,6 +102,8 @@ export async function GET(request: Request) {
         source: lead.source.name,
         status: lead.status,
         score_final: lead.score,
+        ownerId: lead.ownerId,
+        ownerName: lead.ownerUser?.name ?? null,
         signalLevel: signal.signalLevel,
         temperature,
         reasons: signal.reasons,
@@ -120,26 +113,57 @@ export async function GET(request: Request) {
         lastSignalSourceUrl: signal.lastSignalSourceUrl,
         lastSignalConfidence: signal.lastSignalConfidence,
         lastActivityAt: lead.lastActivityAt,
+        lastHumanActivityAt: lead.lastHumanActivityAt,
+        sla: {
+          status: sla.status,
+          label: sla.label,
+          hoursElapsed: Math.round(sla.hoursElapsed),
+        },
       };
     });
 
-    // Sort: temperature ASC → lastSignalAt DESC → score_final DESC
-    enriched.sort((a, b) => {
-      // 1. Temperature priority
-      const tempDiff =
-        (TEMP_ORDER[a.temperature] ?? 99) - (TEMP_ORDER[b.temperature] ?? 99);
-      if (tempDiff !== 0) return tempDiff;
+    // Sort based on mode
+    if (sortMode === "sla") {
+      // SLA sort: OVERDUE first → WARNING → OK, then temperature, then signal
+      enriched.sort((a, b) => {
+        const slaDiff =
+          (SLA_ORDER[a.sla.status] ?? 99) - (SLA_ORDER[b.sla.status] ?? 99);
+        if (slaDiff !== 0) return slaDiff;
 
-      // 2. Last signal date (most recent first, nulls last)
-      const aSignal = a.lastSignalAt ? new Date(a.lastSignalAt).getTime() : 0;
-      const bSignal = b.lastSignalAt ? new Date(b.lastSignalAt).getTime() : 0;
-      if (aSignal !== bSignal) return bSignal - aSignal;
+        const tempDiff =
+          (TEMP_ORDER[a.temperature] ?? 99) -
+          (TEMP_ORDER[b.temperature] ?? 99);
+        if (tempDiff !== 0) return tempDiff;
 
-      // 3. Score descending (nulls last)
-      const aScore = a.score_final ?? -1;
-      const bScore = b.score_final ?? -1;
-      return bScore - aScore;
-    });
+        const aSignal = a.lastSignalAt
+          ? new Date(a.lastSignalAt).getTime()
+          : 0;
+        const bSignal = b.lastSignalAt
+          ? new Date(b.lastSignalAt).getTime()
+          : 0;
+        return bSignal - aSignal;
+      });
+    } else {
+      // Default: temperature → lastSignalAt → score
+      enriched.sort((a, b) => {
+        const tempDiff =
+          (TEMP_ORDER[a.temperature] ?? 99) -
+          (TEMP_ORDER[b.temperature] ?? 99);
+        if (tempDiff !== 0) return tempDiff;
+
+        const aSignal = a.lastSignalAt
+          ? new Date(a.lastSignalAt).getTime()
+          : 0;
+        const bSignal = b.lastSignalAt
+          ? new Date(b.lastSignalAt).getTime()
+          : 0;
+        if (aSignal !== bSignal) return bSignal - aSignal;
+
+        const aScore = a.score_final ?? -1;
+        const bScore = b.score_final ?? -1;
+        return bScore - aScore;
+      });
+    }
 
     return NextResponse.json({
       success: true,
