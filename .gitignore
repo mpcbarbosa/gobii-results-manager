@@ -36,3 +36,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+*.bak
+*.bak2
+*.pre_postinstall.bak
+*.fix_syntax.bak
