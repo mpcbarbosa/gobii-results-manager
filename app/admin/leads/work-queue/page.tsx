@@ -9,6 +9,7 @@ import {
   changeLeadStatus,
   createActivity,
   assignLeadOwner,
+  completeTask,
   type WorkQueueItem,
 } from '@/lib/adminApi';
 import { formatDate } from '@/lib/date';
@@ -345,6 +346,7 @@ export default function WorkQueuePage() {
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
   const [filterSource, setFilterSource] = useState<string>('ALL');
   const [signalsOnly, setSignalsOnly] = useState(false);
+  const [tasksOnly, setTasksOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Quick actions
@@ -417,6 +419,9 @@ export default function WorkQueuePage() {
     if (signalsOnly) {
       result = result.filter((i) => i.lastSignalAt !== null);
     }
+    if (tasksOnly) {
+      result = result.filter((i) => i.openTasksCount > 0);
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       result = result.filter(
@@ -427,7 +432,7 @@ export default function WorkQueuePage() {
     }
 
     return result;
-  }, [items, filterTemp, filterStatus, filterSource, signalsOnly, searchQuery]);
+  }, [items, filterTemp, filterStatus, filterSource, signalsOnly, tasksOnly, searchQuery]);
 
   // Quick action: change status
   const handleStatusChange = async (item: WorkQueueItem, newStatus: string) => {
@@ -474,6 +479,27 @@ export default function WorkQueuePage() {
       addToast(`${item.company} assigned to you`, 'success');
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Failed to assign', 'error');
+    }
+  };
+
+  // Quick action: complete next task
+  const handleCompleteTask = async (item: WorkQueueItem) => {
+    if (!item.nextTask) return;
+    try {
+      await completeTask(item.id, item.nextTask.id);
+      // Optimistic update
+      setItems((prev) =>
+        prev.map((i) => {
+          if (i.id !== item.id) return i;
+          const newCount = Math.max(0, i.openTasksCount - 1);
+          return { ...i, openTasksCount: newCount, nextTask: newCount === 0 ? null : i.nextTask, _nextTaskOverdue: false };
+        }),
+      );
+      addToast(`Task completed: ${item.nextTask.title}`, 'success');
+      // Refetch for accurate state
+      loadData();
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to complete task', 'error');
     }
   };
 
@@ -602,17 +628,27 @@ export default function WorkQueuePage() {
               </select>
             </div>
 
-            <div className="flex items-center gap-2 pt-4">
-              <input
-                id="signals-only"
-                type="checkbox"
-                checked={signalsOnly}
-                onChange={(e) => setSignalsOnly(e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <label htmlFor="signals-only" className="text-sm text-gray-700">
-                Signals only
-              </label>
+            <div className="flex items-center gap-4 pt-4">
+              <div className="flex items-center gap-1">
+                <input
+                  id="signals-only"
+                  type="checkbox"
+                  checked={signalsOnly}
+                  onChange={(e) => setSignalsOnly(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <label htmlFor="signals-only" className="text-sm text-gray-700">Signals</label>
+              </div>
+              <div className="flex items-center gap-1">
+                <input
+                  id="tasks-only"
+                  type="checkbox"
+                  checked={tasksOnly}
+                  onChange={(e) => setTasksOnly(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <label htmlFor="tasks-only" className="text-sm text-gray-700">Tasks</label>
+              </div>
             </div>
 
             <div className="pt-4">
@@ -622,6 +658,7 @@ export default function WorkQueuePage() {
                   setFilterStatus('ALL');
                   setFilterSource('ALL');
                   setSignalsOnly(false);
+                  setTasksOnly(false);
                   setSearchQuery('');
                 }}
                 className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 w-full"
@@ -652,6 +689,7 @@ export default function WorkQueuePage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Signal</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Score</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Next Task</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">SLA</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Owner</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -662,7 +700,7 @@ export default function WorkQueuePage() {
                   <SkeletonRows count={8} />
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-4 py-12 text-center text-gray-500">
+                    <td colSpan={13} className="px-4 py-12 text-center text-gray-500">
                       {items.length === 0
                         ? 'No leads in the work queue. All leads may be in terminal status or none exist.'
                         : 'No leads match the current filters.'}
@@ -739,6 +777,34 @@ export default function WorkQueuePage() {
                         )}
                       </td>
 
+                      {/* Next Task */}
+                      <td className="px-4 py-3 max-w-[200px]">
+                        {item.nextTask ? (
+                          <div className="text-xs">
+                            <div className="flex items-center gap-1">
+                              {item.openTasksCount > 1 && (
+                                <span className="inline-block px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold text-[10px]">
+                                  {item.openTasksCount}
+                                </span>
+                              )}
+                              {item.nextTask.autoGenerated && (
+                                <span className="text-amber-600">🧠</span>
+                              )}
+                              <span className="text-gray-800 truncate" title={item.nextTask.title}>
+                                {item.nextTask.title}
+                              </span>
+                            </div>
+                            {item.nextTask.dueAt && (
+                              <div className={`text-[10px] mt-0.5 ${item._nextTaskOverdue ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
+                                {item._nextTaskOverdue ? '⚠️ ' : ''}Due: {formatDate(item.nextTask.dueAt)}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-xs">—</span>
+                        )}
+                      </td>
+
                       {/* SLA */}
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full border ${
@@ -774,6 +840,15 @@ export default function WorkQueuePage() {
                           >
                             + Note
                           </button>
+                          {item.nextTask && (
+                            <button
+                              onClick={() => handleCompleteTask(item)}
+                              className="px-2 py-1 text-xs bg-green-50 text-green-700 rounded hover:bg-green-100 border border-green-200"
+                              title={`Complete: ${item.nextTask.title}`}
+                            >
+                              ✓ Done
+                            </button>
+                          )}
                           {myUserId && item.ownerId !== myUserId && (
                             <button
                               onClick={() => handleAssignToMe(item)}
