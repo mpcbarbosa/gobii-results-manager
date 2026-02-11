@@ -3,10 +3,12 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminTokenGate from '@/components/admin/AdminTokenGate';
+import UserIdentitySelector, { getMyUserId } from '@/components/admin/UserIdentitySelector';
 import {
   fetchWorkQueue,
   changeLeadStatus,
   createActivity,
+  assignLeadOwner,
   type WorkQueueItem,
 } from '@/lib/adminApi';
 import { formatDate } from '@/lib/date';
@@ -348,6 +350,13 @@ export default function WorkQueuePage() {
   // Quick actions
   const [noteModal, setNoteModal] = useState<{ leadId: string; company: string } | null>(null);
   const [changingStatus, setChangingStatus] = useState<string | null>(null);
+  const [myUserId, setMyUserIdState] = useState<string | null>(null);
+
+  // Initialize myUserId from localStorage
+  useEffect(() => {
+    const stored = getMyUserId();
+    if (stored) setMyUserIdState(stored);
+  }, []);
 
   // Toasts
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -446,8 +455,26 @@ export default function WorkQueuePage() {
     const company = noteModal?.company ?? 'Lead';
     setNoteModal(null);
     addToast(`Note added to ${company}`, 'success');
-    // Refetch to update lastActivityAt
     loadData();
+  };
+
+  // Quick action: assign to me
+  const handleAssignToMe = async (item: WorkQueueItem) => {
+    if (!myUserId) {
+      addToast('Select your identity first', 'error');
+      return;
+    }
+    try {
+      await assignLeadOwner(item.id, myUserId);
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === item.id ? { ...i, ownerId: myUserId, ownerName: 'Me' } : i,
+        ),
+      );
+      addToast(`${item.company} assigned to you`, 'success');
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Failed to assign', 'error');
+    }
   };
 
   // Summary counts
@@ -459,6 +486,11 @@ export default function WorkQueuePage() {
     <AdminTokenGate>
       <div className="min-h-screen bg-gray-50 p-8">
         <div className="max-w-[1400px] mx-auto">
+          {/* Identity selector */}
+          <div className="mb-4">
+            <UserIdentitySelector onChange={(id) => setMyUserIdState(id)} />
+          </div>
+
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -742,6 +774,15 @@ export default function WorkQueuePage() {
                           >
                             + Note
                           </button>
+                          {myUserId && item.ownerId !== myUserId && (
+                            <button
+                              onClick={() => handleAssignToMe(item)}
+                              className="px-2 py-1 text-xs bg-purple-50 text-purple-700 rounded hover:bg-purple-100 border border-purple-200"
+                              title="Assign to me"
+                            >
+                              📌 Me
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

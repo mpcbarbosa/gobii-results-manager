@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import AdminTokenGate from '@/components/admin/AdminTokenGate';
+import UserIdentitySelector, { getMyUserId } from '@/components/admin/UserIdentitySelector';
 import {
   fetchWorkQueue,
   changeLeadStatus,
@@ -159,6 +160,7 @@ export default function MyQueuePage() {
   const [changingStatus, setChangingStatus] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastIdRef = useRef(0);
+  const [myUserId, setMyUserIdState] = useState<string | null>(null);
 
   const addToast = useCallback((message: string, type: 'success' | 'error') => {
     const id = ++toastIdRef.current;
@@ -170,25 +172,35 @@ export default function MyQueuePage() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // For my-queue, we use a fixed ownerId. Since we don't have real user sessions,
-  // we'll load all leads and let the user see their assigned ones.
-  // In production, ownerId would come from the session.
-  const loadData = useCallback(async () => {
+  // Initialize myUserId from localStorage
+  useEffect(() => {
+    const stored = getMyUserId();
+    if (stored) setMyUserIdState(stored);
+  }, []);
+
+  const loadData = useCallback(async (userId?: string) => {
+    const ownerId = userId || myUserId;
     try {
       setLoading(true);
       setError(null);
-      // Sort by SLA for my-queue (OVERDUE first)
-      const res = await fetchWorkQueue({ sort: 'sla' });
-      // Filter to only leads with an owner (my-queue shows assigned leads)
-      setItems(res.items.filter((i) => i.ownerId));
+      const res = await fetchWorkQueue({
+        sort: 'sla',
+        ...(ownerId ? { ownerId } : {}),
+      });
+      setItems(ownerId ? res.items : res.items.filter((i) => i.ownerId));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load my queue');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [myUserId]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  const handleUserChange = (userId: string) => {
+    setMyUserIdState(userId);
+    loadData(userId);
+  };
 
   const filtered = useMemo(() => {
     let result = items;
@@ -229,6 +241,11 @@ export default function MyQueuePage() {
     <AdminTokenGate>
       <div className="min-h-screen bg-gray-50 p-8">
         <div className="max-w-[1400px] mx-auto">
+          {/* Identity selector */}
+          <div className="mb-4">
+            <UserIdentitySelector onChange={handleUserChange} />
+          </div>
+
           {/* Header */}
           <div className="flex justify-between items-center mb-6">
             <div>
@@ -237,7 +254,7 @@ export default function MyQueuePage() {
             </div>
             <div className="flex items-center gap-3">
               <button onClick={() => router.push('/admin/leads/work-queue')} className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50">← All Leads Queue</button>
-              <button onClick={loadData} disabled={loading} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">{loading ? 'Loading...' : '↻ Refresh'}</button>
+              <button onClick={() => loadData()} disabled={loading} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">{loading ? 'Loading...' : '↻ Refresh'}</button>
             </div>
           </div>
 

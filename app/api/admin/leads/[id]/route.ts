@@ -53,6 +53,13 @@ export async function GET(
             size: true,
           },
         },
+        ownerUser: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
         activities: {
           where: {
             type: "SYSTEM",
@@ -141,6 +148,9 @@ export async function GET(
         score_final: lead.score,
         notes: lead.notes,
         owner: lead.owner,
+        ownerId: lead.ownerId,
+        ownerName: lead.ownerUser?.name ?? null,
+        ownerEmail: lead.ownerUser?.email ?? null,
         nextActionAt: lead.nextActionAt,
         seenCount: lead.seenCount,
         lastSeenAt: lead.lastSeenAt,

@@ -76,7 +76,7 @@ export async function POST(
     const body = await request.json();
 
     // Validate required fields
-    const { type, title, notes, dueAt } = body;
+    const { type, title, notes, dueAt, createdById: requestedCreatedById } = body;
 
     if (!type || !title) {
       return NextResponse.json(
@@ -105,17 +105,29 @@ export async function POST(
       );
     }
 
-    // Get the first admin user (for now, we'll use the first admin as the creator)
-    // In a real system, you'd extract the user from the session/token
-    const adminUser = await prisma.user.findFirst({
-      where: { role: 'ADMIN' },
-    });
+    // Resolve creator: use provided createdById if valid, else fallback to first admin
+    let creatorId: string | null = null;
+    if (requestedCreatedById && typeof requestedCreatedById === 'string') {
+      const requestedUser = await prisma.user.findUnique({
+        where: { id: requestedCreatedById },
+        select: { id: true },
+      });
+      if (requestedUser) {
+        creatorId = requestedUser.id;
+      }
+    }
 
-    if (!adminUser) {
-      return NextResponse.json(
-        { error: 'No admin user found in system' },
-        { status: 500 }
-      );
+    if (!creatorId) {
+      const adminUser = await prisma.user.findFirst({
+        where: { role: 'ADMIN' },
+      });
+      if (!adminUser) {
+        return NextResponse.json(
+          { error: 'No admin user found in system' },
+          { status: 500 }
+        );
+      }
+      creatorId = adminUser.id;
     }
 
     // Determine if this is a human activity (not SYSTEM)
@@ -136,7 +148,7 @@ export async function POST(
           title,
           notes: notes || null,
           dueAt: dueAt ? new Date(dueAt) : null,
-          createdById: adminUser.id,
+          createdById: creatorId,
         },
         include: {
           createdBy: {
@@ -181,7 +193,7 @@ export async function POST(
             fromStatus: LeadStatus.NEW,
             toStatus: LeadStatus.CONTACTED,
             reason: 'Automatically changed to CONTACTED on first human activity',
-            changedById: adminUser.id,
+            changedById: creatorId,
           },
         });
       }
