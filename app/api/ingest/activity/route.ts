@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { resolveLead } from '@/lib/utils/resolveLead';
 import { Prisma } from '@prisma/client';
+import { autoGenerateTaskIfNeeded } from '@/lib/crm/autoTaskEngine';
 
 // Categories that trigger automatic status change from NEW to CONTACTED
 const AUTO_CONTACT_CATEGORIES = ['RFP', 'EXPANSION'];
@@ -189,13 +190,32 @@ export async function POST(request: NextRequest) {
         });
       }
       
-      return newActivity;
+      return { newActivity, systemUser };
     });
     
+    // After transaction: auto-generate TASK if signal warrants it
+    let autoTaskId: string | null = null;
+    try {
+      const autoResult = await autoGenerateTaskIfNeeded(prisma, {
+        leadId: lead.id,
+        ownerId: lead.ownerId ?? null,
+        category: activity.meta?.category ?? null,
+        confidence: activity.meta?.confidence ?? null,
+        systemUserId: result.systemUser.id,
+      });
+      if (autoResult.created) {
+        autoTaskId = autoResult.taskId;
+      }
+    } catch (autoErr) {
+      // Log but don't fail the main request
+      console.error('[ingest/activity] Auto-task error:', autoErr);
+    }
+
     return NextResponse.json({
       success: true,
       leadId: lead.id,
-      activityId: result.id,
+      activityId: result.newActivity.id,
+      autoTaskId,
     });
     
   } catch (error) {
