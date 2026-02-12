@@ -253,7 +253,8 @@ export default function MyQueuePage() {
               <p className="text-gray-500 mt-1">Your assigned leads — sorted by SLA urgency</p>
             </div>
             <div className="flex items-center gap-3">
-              <button onClick={() => router.push('/admin/leads/work-queue')} className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50">← All Leads Queue</button>
+              <button onClick={() => router.push('/admin/leads/work-queue')} className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50">🗂️ Work Queue</button>
+              <button onClick={() => router.push('/admin/tasks')} className="px-4 py-2 text-sm border border-green-300 text-green-700 rounded-md hover:bg-green-50">📋 Tasks</button>
               <button onClick={() => loadData()} disabled={loading} className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50">{loading ? 'Loading...' : '↻ Refresh'}</button>
             </div>
           </div>

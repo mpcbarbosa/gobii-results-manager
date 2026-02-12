@@ -347,6 +347,7 @@ export default function WorkQueuePage() {
   const [filterSource, setFilterSource] = useState<string>('ALL');
   const [signalsOnly, setSignalsOnly] = useState(false);
   const [tasksOnly, setTasksOnly] = useState(false);
+  const [unassignedOnly, setUnassignedOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Quick actions
@@ -422,6 +423,9 @@ export default function WorkQueuePage() {
     if (tasksOnly) {
       result = result.filter((i) => i.openTasksCount > 0);
     }
+    if (unassignedOnly) {
+      result = result.filter((i) => !i.ownerId);
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.trim().toLowerCase();
       result = result.filter(
@@ -432,7 +436,7 @@ export default function WorkQueuePage() {
     }
 
     return result;
-  }, [items, filterTemp, filterStatus, filterSource, signalsOnly, tasksOnly, searchQuery]);
+  }, [items, filterTemp, filterStatus, filterSource, signalsOnly, tasksOnly, unassignedOnly, searchQuery]);
 
   // Quick action: change status
   const handleStatusChange = async (item: WorkQueueItem, newStatus: string) => {
@@ -530,13 +534,19 @@ export default function WorkQueuePage() {
                 onClick={() => router.push('/admin/leads/my-queue')}
                 className="px-4 py-2 text-sm border border-purple-300 text-purple-700 rounded-md hover:bg-purple-50"
               >
-                My Queue
+                📌 As minhas
+              </button>
+              <button
+                onClick={() => router.push('/admin/tasks')}
+                className="px-4 py-2 text-sm border border-green-300 text-green-700 rounded-md hover:bg-green-50"
+              >
+                📋 Tasks
               </button>
               <button
                 onClick={() => router.push('/admin/leads')}
                 className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
               >
-                ← Leads Inbox
+                ← Leads
               </button>
               <button
                 onClick={loadData}
@@ -649,6 +659,12 @@ export default function WorkQueuePage() {
                 />
                 <label htmlFor="tasks-only" className="text-sm text-gray-700">Tasks</label>
               </div>
+              <button
+                onClick={() => setUnassignedOnly(!unassignedOnly)}
+                className={`px-2 py-1 text-xs rounded border ${unassignedOnly ? 'bg-blue-100 border-blue-300 text-blue-800 font-semibold' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+              >
+                🟦 Não atribuídas{unassignedOnly ? ` (${items.filter((i) => !i.ownerId).length})` : ''}
+              </button>
             </div>
 
             <div className="pt-4">
@@ -659,6 +675,7 @@ export default function WorkQueuePage() {
                   setFilterSource('ALL');
                   setSignalsOnly(false);
                   setTasksOnly(false);
+                  setUnassignedOnly(false);
                   setSearchQuery('');
                 }}
                 className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 w-full"
