@@ -183,6 +183,7 @@ export async function GET(request: Request) {
           label: sla.label,
           hoursElapsed: Math.round(sla.hoursElapsed),
         },
+        multiSignalCount: systemActivities.length,
         openTasksCount,
         nextTask,
         _nextTaskOverdue: nextTaskOverdue,

@@ -49,7 +49,7 @@ export { parseSystemMeta as parseActivityMeta } from "./parseSystemMeta";
 const HIGH_CATEGORIES = new Set(["RFP", "ERP_REPLACEMENT"]);
 
 /** Categories that indicate MEDIUM commercial intent */
-const MEDIUM_CATEGORIES = new Set(["EXPANSION", "C_LEVEL"]);
+const MEDIUM_CATEGORIES = new Set(["EXPANSION", "C_LEVEL", "CLEVEL", "SECTOR"]);
 
 /** Number of days to consider for the "recent activity burst" rule */
 const RECENT_WINDOW_DAYS = 14;
@@ -156,7 +156,8 @@ export function deriveCommercialSignal(
       ];
       for (const cat of categories) {
         if (cat === "EXPANSION") reasons.push("Recent expansion signal");
-        else if (cat === "C_LEVEL") reasons.push("C-level change detected");
+        else if (cat === "C_LEVEL" || cat === "CLEVEL") reasons.push("C-level change detected");
+        else if (cat === "SECTOR") reasons.push("Sector investment signal");
         else reasons.push(`${cat} detected`);
       }
     }

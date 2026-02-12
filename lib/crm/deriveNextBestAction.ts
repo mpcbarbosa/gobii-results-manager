@@ -111,7 +111,55 @@ export function deriveNextBestAction(input: DeriveInput): NextBestAction {
     };
   }
 
-  // Any category + HIGH confidence
+  // EXPANSION + HIGH
+  if (cat === "EXPANSION" && conf === "HIGH") {
+    return {
+      shouldCreate: true,
+      title: "Contactar direção de operações",
+      dueDate: hoursFromNow(24),
+      priority: "HIGH",
+      notes: buildNotes(cat, conf, [
+        "Review expansion details and scope",
+        "Identify operations director or CIO",
+        "Assess ERP impact of expansion",
+        "Prepare outreach with expansion-specific value proposition",
+      ]),
+    };
+  }
+
+  // CLEVEL + HIGH
+  if ((cat === "CLEVEL" || cat === "C_LEVEL") && conf === "HIGH") {
+    return {
+      shouldCreate: true,
+      title: "Contactar novo executivo",
+      dueDate: hoursFromNow(24),
+      priority: "HIGH",
+      notes: buildNotes(cat, conf, [
+        "Research new executive background and priorities",
+        "Identify potential technology review triggers",
+        "Prepare personalized outreach",
+        "Schedule introductory meeting",
+      ]),
+    };
+  }
+
+  // SECTOR + HIGH
+  if (cat === "SECTOR" && conf === "HIGH") {
+    return {
+      shouldCreate: true,
+      title: "Avaliar campanha setorial",
+      dueDate: hoursFromNow(48),
+      priority: "MEDIUM",
+      notes: buildNotes(cat, conf, [
+        "Review sector investment data",
+        "Identify target companies in sector",
+        "Assess campaign viability",
+        "Plan sector-specific outreach strategy",
+      ]),
+    };
+  }
+
+  // Any category + HIGH confidence (generic fallback)
   if (conf === "HIGH") {
     return {
       shouldCreate: true,

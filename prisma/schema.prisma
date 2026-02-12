@@ -507,3 +507,20 @@ model Activity {
   @@index([completedAt])
   @@map("activities")
 }
+
+// Sector Intelligence: macro-level sector data (not tied to individual leads)
+model SectorIntelligence {
+  id                  String   @id @default(uuid()) @db.Uuid
+  sector              String
+  growth              String?  // e.g., "high", "moderate", "low"
+  investmentIntensity String?  @map("investment_intensity")
+  maturity            String?  // e.g., "emerging", "mature", "declining"
+  erpProbability      String?  @map("erp_probability") // HIGH/MEDIUM/LOW
+  source              String?
+  detectedAt          DateTime @map("detected_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@index([sector])
+  @@index([detectedAt])
+  @@map("sector_intelligence")
+}
