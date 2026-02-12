@@ -99,14 +99,34 @@ export default function AdminLeadsPage() {
     <AdminTokenGate>
       <div className="min-h-screen bg-gray-50 p-8">
         <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
             <h1 className="text-3xl font-bold">Leads Inbox</h1>
-            <button
-              onClick={handleExport}
-              className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
-            >
-              Export CSV
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={() => router.push('/admin/leads/work-queue')}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                🗂️ Work Queue
+              </button>
+              <button
+                onClick={() => router.push('/admin/leads/my-queue')}
+                className="px-4 py-2 text-sm border border-purple-300 text-purple-700 rounded-md hover:bg-purple-50"
+              >
+                📌 As minhas
+              </button>
+              <button
+                onClick={() => router.push('/admin/tasks')}
+                className="px-4 py-2 text-sm border border-green-300 text-green-700 rounded-md hover:bg-green-50"
+              >
+                📋 Tasks
+              </button>
+              <button
+                onClick={handleExport}
+                className="bg-green-600 text-white px-4 py-2 text-sm rounded-md hover:bg-green-700 transition-colors"
+              >
+                Export CSV
+              </button>
+            </div>
           </div>
           
           {/* Filters */}
