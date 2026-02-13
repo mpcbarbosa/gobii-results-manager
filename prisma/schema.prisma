@@ -524,3 +524,23 @@ model SectorIntelligence {
   @@index([detectedAt])
   @@map("sector_intelligence")
 }
+
+// Agent Ingest Audit: observability for agent integrations
+model AgentIngestAudit {
+  id            String   @id @default(uuid()) @db.Uuid
+  agent         String
+  endpoint      String   // e.g. /api/ingest/leads, /api/ingest/activity, /api/ingest/sectors
+  status        String   // SUCCESS | SKIPPED | ERROR
+  processed     Int      @default(0)
+  created       Int      @default(0)
+  updated       Int      @default(0)
+  skipped       Int      @default(0)
+  errorMessage  String?  @map("error_message") @db.Text
+  meta          Json?    // small payload meta (category counts, sample ids, etc.)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([agent])
+  @@index([createdAt])
+  @@index([status])
+  @@map("agent_ingest_audit")
+}

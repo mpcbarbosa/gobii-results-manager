@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma';
 import { resolveLead } from '@/lib/utils/resolveLead';
 import { Prisma } from '@prisma/client';
 import { autoGenerateTaskIfNeeded } from '@/lib/crm/autoTaskEngine';
+import { recordIngestAudit } from '@/lib/crm/auditIngest';
 
 // Categories that trigger automatic status change from NEW to CONTACTED
 const AUTO_CONTACT_CATEGORIES = ['RFP', 'EXPANSION'];
@@ -210,6 +211,16 @@ export async function POST(request: NextRequest) {
       // Log but don't fail the main request
       console.error('[ingest/activity] Auto-task error:', autoErr);
     }
+
+    // Record audit
+    await recordIngestAudit({
+      agent: activity.meta?.agent ?? "unknown",
+      endpoint: "/api/ingest/activity",
+      status: "SUCCESS",
+      processed: 1,
+      created: 1,
+      meta: { category: activity.meta?.category, confidence: activity.meta?.confidence, leadId: lead.id, autoTaskId },
+    });
 
     return NextResponse.json({
       success: true,

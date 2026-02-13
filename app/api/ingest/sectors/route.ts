@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { normalizeAgentPayload } from "@/lib/crm/normalizeAgentPayload";
+import { normalizeUnicodeNFC, resolveField } from "@/lib/crm/normalizeText";
+import { recordIngestAudit } from "@/lib/crm/auditIngest";
 
 /**
  * POST /api/ingest/sectors
@@ -82,18 +84,20 @@ export async function POST(request: NextRequest) {
     let skipped = 0;
 
     for (const item of body.sectors) {
-      // Validate required field
-      if (!item.sector || typeof item.sector !== "string") {
+      // Resolve PT/EN field variants
+      const rawSector = resolveField(item, "sector", "setor") as string | undefined;
+
+      if (!rawSector || typeof rawSector !== "string") {
         results.push({
-          sector: item.sector ?? "unknown",
+          sector: String(rawSector ?? "unknown"),
           action: "skipped",
-          reason: "Missing or invalid 'sector' field",
+          reason: "Missing or invalid 'sector'/'setor' field",
         });
         skipped++;
         continue;
       }
 
-      const sectorName = item.sector.trim();
+      const sectorName = normalizeUnicodeNFC(rawSector);
       if (!sectorName) {
         results.push({
           sector: "empty",
@@ -104,12 +108,14 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Normalize ERP probability
-      const erpRaw = item.erpProbability ?? item.erp_probability ?? normalizedMeta.confidence;
+      // Resolve PT/EN field variants for other fields
+      const erpRaw = resolveField(item, "erpProbability", "erp_probability", "probabilidade_ERP", "probabilidadeERP") as string | undefined ?? normalizedMeta.confidence;
       const erpNormalized = normalizeErpProbability(erpRaw);
+      const sourceRaw = resolveField(item, "source", "fonte_principal", "fonte") as string | undefined;
+      const detectedAtRaw = resolveField(item, "detected_at", "detectedAt") as string | undefined;
 
-      const detectedAt = item.detected_at
-        ? new Date(item.detected_at)
+      const detectedAt = detectedAtRaw
+        ? new Date(detectedAtRaw)
         : new Date(normalizedMeta.detected_at);
 
       // Validate date
@@ -142,7 +148,7 @@ export async function POST(request: NextRequest) {
                   existing.investmentIntensity,
                 maturity: item.maturity ?? existing.maturity,
                 erpProbability: erpNormalized,
-                source: item.source ?? existing.source,
+                source: sourceRaw ?? existing.source,
                 detectedAt,
               },
             });
@@ -171,7 +177,7 @@ export async function POST(request: NextRequest) {
                 null,
               maturity: item.maturity ?? null,
               erpProbability: erpNormalized,
-              source: item.source ?? null,
+              source: sourceRaw ?? null,
               detectedAt,
             },
           });
@@ -191,6 +197,18 @@ export async function POST(request: NextRequest) {
         skipped++;
       }
     }
+
+    // Record audit
+    await recordIngestAudit({
+      agent: normalizedMeta.agent,
+      endpoint: "/api/ingest/sectors",
+      status: created + updated > 0 ? "SUCCESS" : skipped > 0 ? "SKIPPED" : "SUCCESS",
+      processed: body.sectors.length,
+      created,
+      updated,
+      skipped,
+      meta: { itemsFirst3: results.slice(0, 3) },
+    });
 
     return NextResponse.json({
       success: true,
