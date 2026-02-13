@@ -290,6 +290,29 @@ export default function TasksInboxPage() {
             </div>
           )}
 
+          {/* Category chips */}
+          <div className="flex gap-2 mb-4 flex-wrap">
+            {[
+              { key: 'ALL', label: 'Todos', color: 'border-gray-300 text-gray-700' },
+              { key: 'RFP', label: '📄 RFP', color: 'border-red-300 text-red-700' },
+              { key: 'EXPANSION', label: '🏭 Expansão', color: 'border-blue-300 text-blue-700' },
+              { key: 'CLEVEL', label: '👔 C-Level', color: 'border-purple-300 text-purple-700' },
+              { key: 'SECTOR', label: '📊 Setor', color: 'border-green-300 text-green-700' },
+            ].map((chip) => (
+              <button
+                key={chip.key}
+                onClick={() => setFilterCategory(chip.key)}
+                className={`px-3 py-1 text-xs rounded-full border font-medium transition-colors ${
+                  filterCategory === chip.key
+                    ? `${chip.color} bg-opacity-20 ring-1 ring-current font-semibold`
+                    : 'border-gray-200 text-gray-500 hover:border-gray-400'
+                }`}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+
           {/* Filters */}
           <div className="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
             <div>

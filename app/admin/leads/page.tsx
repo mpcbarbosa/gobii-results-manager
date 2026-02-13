@@ -121,6 +121,12 @@ export default function AdminLeadsPage() {
                 📋 Tasks
               </button>
               <button
+                onClick={() => router.push('/admin/intelligence/sectors')}
+                className="px-4 py-2 text-sm border border-amber-300 text-amber-700 rounded-md hover:bg-amber-50"
+              >
+                📊 Intelligence
+              </button>
+              <button
                 onClick={handleExport}
                 className="bg-green-600 text-white px-4 py-2 text-sm rounded-md hover:bg-green-700 transition-colors"
               >
