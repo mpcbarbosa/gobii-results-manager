@@ -511,7 +511,7 @@ model Activity {
 // Sector Intelligence: macro-level sector data (not tied to individual leads)
 model SectorIntelligence {
   id                  String   @id @default(uuid()) @db.Uuid
-  sector              String
+  sector              String   @unique
   growth              String?  // e.g., "high", "moderate", "low"
   investmentIntensity String?  @map("investment_intensity")
   maturity            String?  // e.g., "emerging", "mature", "declining"
