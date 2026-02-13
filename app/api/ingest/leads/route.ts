@@ -5,6 +5,7 @@ import { generateDedupeKey } from '@/lib/utils/dedupe';
 import { normalizeCompanyName, normalizeEmail } from '@/lib/utils/normalize';
 import { generateDomainSuggestionFromLeadData, isInvalidDomain } from '@/lib/utils/domain-suggestion';
 import { LeadStatus } from '@prisma/client';
+import { recordIngestAudit } from '@/lib/crm/auditIngest';
 
 // Authentication middleware
 function authenticate(request: NextRequest): { success: boolean; error?: string; status?: number } {
@@ -123,6 +124,18 @@ export async function POST(request: NextRequest) {
     
     console.log(`Ingestion completed: ${results.created} created, ${results.updated} updated, ${results.skipped} skipped, ${results.domainAutofill.applied} domains autofilled`);
     
+    // Record audit
+    await recordIngestAudit({
+      agent: sourceInput.key ?? "unknown",
+      endpoint: "/api/ingest/leads",
+      status: results.created + results.updated > 0 ? "SUCCESS" : "SKIPPED",
+      processed: leadsInput.length,
+      created: results.created,
+      updated: results.updated,
+      skipped: results.skipped,
+      meta: { sourceKey: sourceInput.key, sampleIds: results.ids.slice(0, 3) },
+    });
+
     return NextResponse.json({
       success: true,
       counts: {
@@ -138,6 +151,13 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Ingestion error:', error);
     
+    await recordIngestAudit({
+      agent: "unknown",
+      endpoint: "/api/ingest/leads",
+      status: "ERROR",
+      errorMessage: error instanceof Error ? error.message : "Unknown error",
+    });
+
     return NextResponse.json(
       {
         error: 'Internal server error',
