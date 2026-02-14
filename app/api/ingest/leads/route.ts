@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import prisma from '@/lib/prisma';
 import { ingestBatchSchema, type LeadInput } from '@/lib/validators/ingest';
 import { generateDedupeKey } from '@/lib/utils/dedupe';
@@ -98,7 +98,8 @@ export async function POST(request: NextRequest) {
           throw new Error('Source is required (either at request level or lead level)');
         }
         
-        const result = await processLead(leadSource.key, source.id, leadInput);
+                const src = await getSourceForKey(leadSource.key);
+        const result = await processLead(leadSource.key, src.id, leadInput);
         results.ids.push(result.leadId);
         results.debug.push({ 
           leadId: result.leadId, 
