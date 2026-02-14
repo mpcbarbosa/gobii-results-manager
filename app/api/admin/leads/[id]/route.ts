@@ -158,6 +158,17 @@ return NextResponse.json(
       createdAt: a.createdAt,
     }));
     const signal = deriveCommercialSignal(systemActivities);
+
+// Fallback: derive category from source when no system signals exist
+if (!signal.lastSignalCategory) {
+  const derived = deriveCategoryFromSourceName(lead.source?.name ?? null);
+  if (derived) {
+    signal.lastSignalCategory = derived;
+    signal.reasons = Array.isArray(signal.reasons)
+      ? [...signal.reasons, "Derived category from source fallback (" + derived + ")"]
+      : ["Derived category from source fallback (" + derived + ")"];
+  }
+}
     const temperature = deriveLeadTemperature(signal.signalLevel);
 
     return NextResponse.json({
