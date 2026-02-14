@@ -8,48 +8,52 @@ import { recordIngestAudit } from "@/lib/crm/auditIngest";
 // Canonicalization
 // ---------------------------------------------------------------------------
 
-/** Known manual fixes for irrecoverable mojibake */
-const MANUAL_FIXES: Record<string, string> = {
-  "ind\uFFFDstria transformadora": "Indústria transformadora",
-  "ind\uFFFDstria": "Indústria",
+/** Direct mojibake string replacement map (literal UTF-8 double-encoded sequences) */
+const MOJIBAKE_MAP: Record<string, string> = {
+  "\u00C3\u00A1": "\u00E1", // á
+  "\u00C3\u00A2": "\u00E2", // â
+  "\u00C3\u00A3": "\u00E3", // ã
+  "\u00C3\u00A4": "\u00E4", // ä
+  "\u00C3\u00A7": "\u00E7", // ç
+  "\u00C3\u00A9": "\u00E9", // é
+  "\u00C3\u00AA": "\u00EA", // ê
+  "\u00C3\u00AD": "\u00ED", // í
+  "\u00C3\u00B3": "\u00F3", // ó
+  "\u00C3\u00B4": "\u00F4", // ô
+  "\u00C3\u00BA": "\u00FA", // ú
+  "\u00C3\u00A0": "\u00E0", // à
+  "\u00C3\u0089": "\u00C9", // É
+  "\u00C3\u0093": "\u00D3", // Ó
+  "\u00C3\u009A": "\u00DA", // Ú
+  "\u00C2": "",              // stray Â
+  "\u00EF\u00BF\u00BD": "\u00FA", // ï¿½ → ú (most common case)
 };
+
+function repairMojibake(s: string): string {
+  // Sort by length descending to match longer sequences first
+  const entries = Object.entries(MOJIBAKE_MAP).sort((a, b) => b[0].length - a[0].length);
+  for (const [bad, good] of entries) {
+    s = s.split(bad).join(good);
+  }
+  // Remove replacement character
+  s = s.replace(/\uFFFD/g, "");
+  return s;
+}
 
 function canonicalizeSector(raw: string): string {
   let s = raw.trim();
 
-  // 1. Try latin1→utf8 repair if contains mojibake markers
-  if (/[\u00C3\u00C2]/.test(s)) {
-    try {
-      const buf = Buffer.from(s, "latin1");
-      const repaired = buf.toString("utf8");
-      // Only use if it looks better (no replacement chars and shorter or same)
-      if (!repaired.includes("\uFFFD") && repaired.length <= s.length + 2) {
-        s = repaired;
-      }
-    } catch {
-      // ignore
-    }
-  }
+  // 1. Direct mojibake repair
+  s = repairMojibake(s);
 
-  // 2. Manual fixes for known irrecoverable patterns
-  const lower = s.toLowerCase();
-  for (const [pattern, fix] of Object.entries(MANUAL_FIXES)) {
-    if (lower.includes(pattern)) {
-      s = s.replace(new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), fix);
-    }
-  }
-
-  // 3. Remove replacement character
-  s = s.replace(/\uFFFD/g, "");
-
-  // 4. NFC normalize
+  // 2. NFC normalize
   try {
     s = s.normalize("NFC");
   } catch {
     // ignore
   }
 
-  // 5. Collapse spaces
+  // 3. Collapse spaces
   s = s.replace(/\s+/g, " ").trim();
 
   return s;
