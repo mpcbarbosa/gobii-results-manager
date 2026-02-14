@@ -41,7 +41,7 @@ export async function GET(
         // @ts-ignore
         const reasons = Array.isArray(item.commercialSignal.reasons) ? item.commercialSignal.reasons : [];
         // @ts-ignore
-        item.commercialSignal.reasons = [...reasons, Derived category from source fallback ()];
+        item.commercialSignal.reasons = [...reasons, "Derived category from source fallback (" + derived + ")"];
       }
     }
   } catch { /* noop */ }
