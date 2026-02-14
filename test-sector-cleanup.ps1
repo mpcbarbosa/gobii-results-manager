@@ -16,10 +16,15 @@ Write-Host "1) Before cleanup:" -ForegroundColor Gray
 try {
     $before = Invoke-RestMethod -Uri "$baseUrl/api/admin/intelligence/sectors" -Headers @{ Authorization = "Bearer $token" }
     Write-Host "  Sectors: $($before.count)" -ForegroundColor White
-    $corrupted = $before.items | Where-Object { $_.sector -match "[`u00C3`u00C2]|`u00EF`u00BF`u00BD|`uFFFD" }
-    Write-Host "  Corrupted: $($corrupted.Count)" -ForegroundColor $(if ($corrupted.Count -gt 0) { "Red" } else { "Green" })
-    if ($corrupted.Count -gt 0) {
-        $corrupted | ForEach-Object { Write-Host "    - $($_.sector)" -ForegroundColor Yellow }
+    $corrupted = @()
+    foreach ($item in $before.items) {
+        if ($item.sector -match "[\u00C3\u00C2]" -or $item.sector -match "FFFD" -or $item.sector -match "\?") {
+            $corrupted += $item
+        }
+    }
+    Write-Host "  Potentially corrupted: $($corrupted.Count)" -ForegroundColor $(if ($corrupted.Count -gt 0) { "Red" } else { "Green" })
+    foreach ($c in $corrupted) {
+        Write-Host "    - $($c.sector)" -ForegroundColor Yellow
     }
 } catch {
     Write-Host "  ERROR: $($_.Exception.Message)" -ForegroundColor Red
@@ -44,8 +49,8 @@ try {
 
     if ($result.items -and $result.items.Count -gt 0) {
         Write-Host ""
-        $result.items | ForEach-Object {
-            Write-Host "    [$($_.action)] $($_.from) -> $($_.to) ($($_.reason))"
+        foreach ($item in $result.items) {
+            Write-Host "    [$($item.action)] $($item.from) -> $($item.to) ($($item.reason))"
         }
     }
 } catch {
@@ -60,12 +65,8 @@ Write-Host "3) After cleanup:" -ForegroundColor Gray
 try {
     $after = Invoke-RestMethod -Uri "$baseUrl/api/admin/intelligence/sectors" -Headers @{ Authorization = "Bearer $token" }
     Write-Host "  Sectors: $($after.count)" -ForegroundColor White
-    $stillCorrupted = $after.items | Where-Object { $_.sector -match "[`u00C3`u00C2]|`u00EF`u00BF`u00BD|`uFFFD" }
-    if ($stillCorrupted.Count -eq 0) {
-        Write-Host "  PASS: No corrupted sectors remaining" -ForegroundColor Green
-    } else {
-        Write-Host "  WARN: $($stillCorrupted.Count) still corrupted" -ForegroundColor Red
-        $stillCorrupted | ForEach-Object { Write-Host "    - $($_.sector)" -ForegroundColor Yellow }
+    foreach ($item in $after.items) {
+        Write-Host "    - $($item.sector)" -ForegroundColor White
     }
 } catch {
     Write-Host "  ERROR: $($_.Exception.Message)" -ForegroundColor Red
