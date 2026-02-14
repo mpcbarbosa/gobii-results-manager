@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     const { source: sourceInput, leads: leadsInput } = validationResult.data;
     
     // Upsert Source
-    const source = await prisma.source.upsert({
+    const _source = await prisma.source.upsert({
       where: { name: sourceInput.key },
       update: {},
       create: {
@@ -71,6 +71,24 @@ export async function POST(request: NextRequest) {
         isActive: true,
       },
     });
+    // Cache de sources por nome (key) para suportar payloads multi-source no mesmo request
+    const sourceCache = new Map<string, { id: string; name: string; type: string }>();
+    sourceCache.set(sourceInput.key, _source);
+
+    async function getSourceForKey(key: string) {
+      const cached = sourceCache.get(key);
+      if (cached) return cached;
+
+      const s = await prisma.source.upsert({
+        where: { name: key },
+        update: {},
+        create: { name: key, type: 'scanner' },
+      });
+
+      sourceCache.set(key, s);
+      return s;
+    }
+
     
     // Process leads
     const results = {
