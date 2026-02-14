@@ -45,21 +45,6 @@ export async function GET(
       }
     }
   } catch { /* noop */ }
-  // Fallback: derive category from source when no system signals exist
-  try {
-    // @ts-expect-error temporary fallback mutation of output
-    const sourceName = (id as any)?.source?.name ?? null;
-    const derived = deriveCategoryFromSourceName(sourceName);
-    // @ts-expect-error temporary fallback mutation of output
-    if (derived && (id as any)?.commercialSignal && !(id as any).commercialSignal.lastSignalCategory) {
-      // @ts-expect-error temporary fallback mutation of output
-      (id as any).commercialSignal.lastSignalCategory = derived;
-      // @ts-expect-error temporary fallback mutation of output
-      const reasons = Array.isArray((id as any).commercialSignal.reasons) ? (id as any).commercialSignal.reasons : [];
-      // @ts-expect-error temporary fallback mutation of output
-      (id as any).commercialSignal.reasons = [...reasons, "Derived category from source fallback (" + derived + ")"];
-    }
-  } catch { /* noop */ }
 return NextResponse.json(
       { error: auth.error },
       { status: auth.status }
