@@ -30,17 +30,17 @@ export async function GET(
     });
       // Derived category from source fallback (when no activities/system signals exist)
   try {
-    // @ts-ignore
+    // @ts-expect-error temporary fallback mutation of item
     if (item?.commercialSignal && !item.commercialSignal.lastSignalCategory) {
       // NOTA: source é objeto (id/name/type). Usamos name primeiro.
-      // @ts-ignore
+      // @ts-expect-error temporary fallback mutation of item
       const derived = deriveCategoryFromSourceName(item?.source?.name ?? null);
       if (derived) {
-        // @ts-ignore
+        // @ts-expect-error temporary fallback mutation of item
         item.commercialSignal.lastSignalCategory = derived;
-        // @ts-ignore
+        // @ts-expect-error temporary fallback mutation of item
         const reasons = Array.isArray(item.commercialSignal.reasons) ? item.commercialSignal.reasons : [];
-        // @ts-ignore
+        // @ts-expect-error temporary fallback mutation of item
         item.commercialSignal.reasons = [...reasons, "Derived category from source fallback (" + derived + ")"];
       }
     }
