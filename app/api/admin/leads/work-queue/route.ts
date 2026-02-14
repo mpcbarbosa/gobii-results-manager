@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/adminAuth";
+import { jsonUtf8 } from "@/lib/http/jsonUtf8";
 import prisma from "@/lib/prisma";
 import { LeadStatus } from "@prisma/client";
 import {
@@ -49,6 +50,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const ownerIdFilter = searchParams.get("ownerId") || undefined;
     const sortMode = searchParams.get("sort") || "temperature";
+    const take = Math.min(parseInt(searchParams.get("take") ?? "50"), 500);
+    const skip = parseInt(searchParams.get("skip") ?? "0");
+    const categoryFilter = searchParams.get("category") || undefined;
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -127,6 +131,16 @@ export async function GET(request: Request) {
       const temperature = deriveLeadTemperature(signal.signalLevel);
       const sla = deriveHumanSLA(lead.lastHumanActivityAt, lead.createdAt);
 
+      // Source-based category fallback when no SYSTEM activities exist
+      let effectiveCategory = signal.lastSignalCategory;
+      if (!effectiveCategory && lead.source.name) {
+        const src = lead.source.name.toLowerCase();
+        if (src.includes("rfp")) effectiveCategory = "RFP";
+        else if (src.includes("expansion")) effectiveCategory = "EXPANSION";
+        else if (src.includes("clevel")) effectiveCategory = "CLEVEL";
+        else if (src.includes("sector")) effectiveCategory = "SECTOR";
+      }
+
       // Tasks
       const leadTasks = tasksByLead.get(lead.id) ?? [];
       const openTasksCount = leadTasks.length;
@@ -172,7 +186,7 @@ export async function GET(request: Request) {
         temperature,
         reasons: signal.reasons,
         lastSignalAt: signal.lastSignalAt,
-        lastSignalCategory: signal.lastSignalCategory,
+        lastSignalCategory: effectiveCategory,
         lastSignalAgent: signal.lastSignalAgent,
         lastSignalSourceUrl: signal.lastSignalSourceUrl,
         lastSignalConfidence: signal.lastSignalConfidence,
@@ -237,10 +251,24 @@ export async function GET(request: Request) {
       });
     }
 
-    return NextResponse.json({
+    // Category filter (post-sort, pre-pagination)
+    let filtered = enriched;
+    if (categoryFilter) {
+      const cat = categoryFilter.toUpperCase();
+      filtered = enriched.filter((i) => i.lastSignalCategory === cat);
+    }
+
+    // Pagination (after sort + filter)
+    const totalCount = filtered.length;
+    const paginated = filtered.slice(skip, skip + take);
+
+    return jsonUtf8({
       success: true,
-      count: enriched.length,
-      items: enriched,
+      totalCount,
+      count: paginated.length,
+      take,
+      skip,
+      items: paginated,
     });
   } catch (error) {
     console.error("[work-queue] Error:", error);
