@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/adminAuth";
 import prisma from "@/lib/prisma";
+import { jsonUtf8 } from "@/lib/http/jsonUtf8";
 
 /**
  * GET /api/admin/intelligence/sectors
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
       take: 200,
     });
 
-    return NextResponse.json({
+    return jsonUtf8({
       success: true,
       count: sectors.length,
       items: sectors,

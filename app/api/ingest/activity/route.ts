@@ -4,6 +4,7 @@ import { resolveLead } from '@/lib/utils/resolveLead';
 import { Prisma } from '@prisma/client';
 import { autoGenerateTaskIfNeeded } from '@/lib/crm/autoTaskEngine';
 import { recordIngestAudit } from '@/lib/crm/auditIngest';
+import { jsonUtf8 } from '@/lib/http/jsonUtf8';
 
 // Categories that trigger automatic status change from NEW to CONTACTED
 const AUTO_CONTACT_CATEGORIES = ['RFP', 'EXPANSION'];
@@ -222,7 +223,7 @@ export async function POST(request: NextRequest) {
       meta: { category: activity.meta?.category, confidence: activity.meta?.confidence, leadId: lead.id, autoTaskId },
     });
 
-    return NextResponse.json({
+    return jsonUtf8({
       success: true,
       leadId: lead.id,
       activityId: result.newActivity.id,

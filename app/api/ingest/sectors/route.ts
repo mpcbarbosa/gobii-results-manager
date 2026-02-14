@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { normalizeAgentPayload } from "@/lib/crm/normalizeAgentPayload";
 import { normalizeUnicodeNFC, resolveField } from "@/lib/crm/normalizeText";
 import { recordIngestAudit } from "@/lib/crm/auditIngest";
+import { jsonUtf8 } from "@/lib/http/jsonUtf8";
 
 /**
  * POST /api/ingest/sectors
@@ -210,7 +211,7 @@ export async function POST(request: NextRequest) {
       meta: { itemsFirst3: results.slice(0, 3) },
     });
 
-    return NextResponse.json({
+    return jsonUtf8({
       success: true,
       agent: normalizedMeta.agent,
       processed: body.sectors.length,

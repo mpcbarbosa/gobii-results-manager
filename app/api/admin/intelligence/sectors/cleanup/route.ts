@@ -3,6 +3,7 @@ import { requireAdminAuth } from "@/lib/adminAuth";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 import { recordIngestAudit } from "@/lib/crm/auditIngest";
+import { jsonUtf8 } from "@/lib/http/jsonUtf8";
 
 // ---------------------------------------------------------------------------
 // Mojibake detection & repair
@@ -231,7 +232,7 @@ export async function POST(request: NextRequest) {
       meta: { groups: groups.size, renamed, merged, deleted, sampleActions: items.slice(0, 5) },
     });
 
-    return NextResponse.json({
+    return jsonUtf8({
       success: true,
       scanned: allSectors.length,
       groups: groups.size,

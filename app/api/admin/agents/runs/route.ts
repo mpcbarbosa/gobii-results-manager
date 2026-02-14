@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/adminAuth";
 import prisma from "@/lib/prisma";
+import { jsonUtf8 } from "@/lib/http/jsonUtf8";
 
 /**
  * GET /api/admin/agents/runs
@@ -44,7 +45,7 @@ export async function GET(request: Request) {
       else if (r.status === "ERROR") summary.error++;
     }
 
-    return NextResponse.json({
+    return jsonUtf8({
       success: true,
       count: runs.length,
       summary,
