@@ -1,9 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
+﻿import { NextRequest, NextResponse } from "next/server";
 import prisma from '@/lib/prisma';
 import { LeadStatus } from '@prisma/client';
 import { requireAdminAuth } from "@/lib/adminAuth";
 import { deriveCommercialSignal, type ActivityInput } from "@/lib/crm/deriveCommercialSignal";
 import { deriveLeadTemperature } from "@/lib/crm/deriveLeadTemperature";
+function deriveCategoryFromSourceName(sourceName: string | null | undefined): string | null {
+  if (!sourceName) return null;
+  const s = sourceName.toLowerCase();
+  if (s.includes("rfpscanner")) return "RFP";
+  if (s.includes("expansionscanner")) return "EXPANSION";
+  if (s.includes("clevelscanner")) return "CLEVEL";
+  if (s.includes("sectorinvestmentscanner")) return "SECTOR";
+  return null;
+}
+
 
 export async function GET(
   request: NextRequest,
@@ -18,7 +28,24 @@ export async function GET(
       hasCookie: !!request.cookies.get('gobii_admin_session'),
       hasBearer: !!request.headers.get('authorization'),
     });
-    return NextResponse.json(
+      // Derived category from source fallback (when no activities/system signals exist)
+  try {
+    // @ts-ignore
+    if (item?.commercialSignal && !item.commercialSignal.lastSignalCategory) {
+      // NOTA: source é objeto (id/name/type). Usamos name primeiro.
+      // @ts-ignore
+      const derived = deriveCategoryFromSourceName(item?.source?.name ?? null);
+      if (derived) {
+        // @ts-ignore
+        item.commercialSignal.lastSignalCategory = derived;
+        // @ts-ignore
+        const reasons = Array.isArray(item.commercialSignal.reasons) ? item.commercialSignal.reasons : [];
+        // @ts-ignore
+        item.commercialSignal.reasons = [...reasons, Derived category from source fallback ()];
+      }
+    }
+  } catch { /* noop */ }
+return NextResponse.json(
       { error: auth.error },
       { status: auth.status }
     );
