@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     const sourceCache = new Map<string, { id: string; name: string; type: string }>();
     sourceCache.set(sourceInput.key, _source);
 
-    async function getSourceForKey(key: string) {
+    async function getOrCreateSourceByKey(key: string) {
       const cached = sourceCache.get(key);
       if (cached) return cached;
 
@@ -113,10 +113,10 @@ export async function POST(request: NextRequest) {
         // Determine source: lead.source > request.source
         const leadSource = leadInput.source || sourceInput;
         if (!leadSource || !leadSource.key) {
-          throw new Error('Source is required (either at request level or lead level)');
+          throw new Error('Source is required (provide source.key at request level OR per lead)');
         }
         
-                const src = await getSourceForKey(leadSource.key);
+                const src = await getOrCreateSourceByKey(leadSource.key);
         const result = await processLead(leadSource.key, src.id, leadInput);
         results.ids.push(result.leadId);
         results.debug.push({ 
