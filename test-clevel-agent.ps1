@@ -1,4 +1,4 @@
-# Test: CLevel Scanner agent ingest
+﻿# Test: CLevel Scanner agent ingest
 $baseUrl = "http://localhost:3000"
 $token = $env:APP_INGEST_TOKEN
 
@@ -9,8 +9,8 @@ Write-Host "`n=== CLevel Scanner Test ===" -ForegroundColor Cyan
 $payload = @{
     company = @{ name = "Grupo Exemplo"; domain = "exemplo.pt" }
     activity = @{
-        title = "Mudança C-Level identificada"
-        notes = "Cargo alterado: CTO`nNome: João Silva`nImpacto ERP: Revisão tecnológica provável`nFonte: https://example.com/clevel/456"
+        title = "MudanÃ§a C-Level identificada"
+        notes = "Cargo alterado: CTO`nNome: JoÃ£o Silva`nImpacto ERP: RevisÃ£o tecnolÃ³gica provÃ¡vel`nFonte: https://example.com/clevel/456"
         meta = @{
             agent = "SAP_S4HANA_CLevelScanner_Daily"
             category = "CLEVEL"
@@ -29,3 +29,4 @@ try {
 } catch {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
 }
+

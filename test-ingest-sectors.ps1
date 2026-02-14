@@ -1,4 +1,4 @@
-# Test: Sector Intelligence ingest endpoint
+﻿# Test: Sector Intelligence ingest endpoint
 # Usage: .\test-ingest-sectors.ps1 [-baseUrl "http://localhost:3000"]
 
 param([string]$baseUrl = "https://gobii-results-manager.onrender.com")
@@ -15,7 +15,7 @@ $payloadPT = @{
     meta = @{ agent = "SAP_S4HANA_SectorInvestmentScanner_Daily"; confidence = "Alta" }
     sectors = @(
         @{
-            setor = "Indústria Farmacêutica"
+            setor = "IndÃºstria FarmacÃªutica"
             growth = "high"
             investmentIntensity = "high"
             maturity = "mature"
@@ -33,13 +33,13 @@ try {
     Write-Host "  ERROR: $($_.Exception.Message)" -ForegroundColor Red
 }
 
-# Test 2: EN field names ("sector") — should upsert
+# Test 2: EN field names ("sector") â€” should upsert
 Write-Host "`n2) Ingesting with EN field names (sector, upsert)..." -ForegroundColor Gray
 $payloadEN = @{
     meta = @{ agent = "SAP_S4HANA_SectorInvestmentScanner_Daily"; confidence = "High" }
     sectors = @(
         @{
-            sector = "Indústria Farmacêutica"
+            sector = "IndÃºstria FarmacÃªutica"
             growth = "high"
             investmentIntensity = "high"
             maturity = "mature"
@@ -48,7 +48,7 @@ $payloadEN = @{
             detected_at = (Get-Date -Format "yyyy-MM-dd")
         },
         @{
-            sector = "Logística e Transportes"
+            sector = "LogÃ­stica e Transportes"
             growth = "moderate"
             investmentIntensity = "medium"
             maturity = "emerging"
@@ -68,3 +68,5 @@ try {
 }
 
 Write-Host "`n=== Test Complete ===" -ForegroundColor Cyan
+
+

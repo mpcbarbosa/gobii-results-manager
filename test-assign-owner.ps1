@@ -1,4 +1,4 @@
-# Test script for PATCH /api/admin/leads/[id]/owner
+﻿# Test script for PATCH /api/admin/leads/[id]/owner
 # Usage: .\test-assign-owner.ps1
 
 $baseUrl = "http://localhost:3000"
@@ -53,3 +53,4 @@ if ($users.items.Count -gt 0) {
         Write-Host "Failed: $($_.Exception.Message)" -ForegroundColor Red
     }
 }
+

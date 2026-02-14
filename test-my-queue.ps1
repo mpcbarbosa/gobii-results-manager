@@ -1,4 +1,4 @@
-# Test script for work queue with SLA data
+﻿# Test script for work queue with SLA data
 # Usage: .\test-my-queue.ps1
 
 $baseUrl = "http://localhost:3000"
@@ -47,3 +47,4 @@ try {
 } catch {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
 }
+

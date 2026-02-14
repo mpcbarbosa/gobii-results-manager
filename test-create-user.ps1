@@ -1,4 +1,4 @@
-# Test script for POST /api/admin/users
+﻿# Test script for POST /api/admin/users
 # Usage: .\test-create-user.ps1
 
 $baseUrl = "http://localhost:3000"
@@ -30,7 +30,7 @@ try {
 } catch {
     $status = $_.Exception.Response.StatusCode.value__
     if ($status -eq 409) {
-        Write-Host "User already exists (409 Conflict) — idempotent!" -ForegroundColor Yellow
+        Write-Host "User already exists (409 Conflict) â€” idempotent!" -ForegroundColor Yellow
     } else {
         Write-Host "ERROR ($status): $($_.Exception.Message)" -ForegroundColor Red
     }
@@ -47,3 +47,4 @@ try {
 } catch {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
 }
+

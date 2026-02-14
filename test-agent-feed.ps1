@@ -1,4 +1,4 @@
-# Test: Agent Feed endpoint
+﻿# Test: Agent Feed endpoint
 # Usage: .\test-agent-feed.ps1 [-baseUrl "http://localhost:3000"]
 
 param([string]$baseUrl = "https://gobii-results-manager.onrender.com")
@@ -51,3 +51,4 @@ try {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
     if ($_.ErrorDetails.Message) { Write-Host $_.ErrorDetails.Message }
 }
+

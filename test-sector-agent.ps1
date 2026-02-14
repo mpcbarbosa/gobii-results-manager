@@ -1,4 +1,4 @@
-# Test: Sector Intelligence endpoint
+﻿# Test: Sector Intelligence endpoint
 $baseUrl = "http://localhost:3000"
 $token = $env:APP_ADMIN_TOKEN
 
@@ -19,3 +19,4 @@ try {
 } catch {
     Write-Host "ERROR: $($_.Exception.Message)" -ForegroundColor Red
 }
+

@@ -1,4 +1,4 @@
-# Test script for POST /api/ingest/activity endpoint
+﻿# Test script for POST /api/ingest/activity endpoint
 # Usage: .\test-activity-ingest.ps1
 
 $baseUrl = "http://localhost:3000"
@@ -18,7 +18,7 @@ $payload = @{
     }
     activity = @{
         title = "RFP identificado para ERP"
-        notes = "Entidade lançou concurso com referência a ERP / SAP S/4HANA."
+        notes = "Entidade lanÃ§ou concurso com referÃªncia a ERP / SAP S/4HANA."
         meta = @{
             agent = "SAP_S4HANA_RFPScanner_Daily"
             category = "RFP"
@@ -57,3 +57,4 @@ try {
         Write-Host $_.ErrorDetails.Message
     }
 }
+

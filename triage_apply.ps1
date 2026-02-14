@@ -69,3 +69,4 @@ foreach ($r in $rows) {
 
 $results | Format-Table -AutoSize
 "`nResumo: OK=$ok | FAIL=$fail | SKIP=$skipped`n"
+

@@ -1,4 +1,4 @@
-# Test script for GET /api/admin/leads/work-queue
+﻿# Test script for GET /api/admin/leads/work-queue
 # Usage: .\test-work-queue.ps1
 #
 # Requires: APP_ADMIN_TOKEN environment variable
@@ -88,3 +88,4 @@ try {
         Write-Host $_.ErrorDetails.Message
     }
 }
+

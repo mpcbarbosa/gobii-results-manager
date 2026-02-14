@@ -1,4 +1,4 @@
-# Test script: verify ownerId consistency between work-queue and lead detail
+﻿# Test script: verify ownerId consistency between work-queue and lead detail
 # Usage: .\test-lead-owner-consistency.ps1
 
 $baseUrl = "http://localhost:3000"
@@ -65,3 +65,4 @@ if ($wqOwnerId -eq $detailOwnerId -and $wqOwnerId -eq $user.id) {
     Write-Host "  Work Queue: $wqOwnerId"
     Write-Host "  Lead Detail: $detailOwnerId"
 }
+
