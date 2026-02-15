@@ -25,6 +25,9 @@ export async function GET(request: Request) {
     const q = searchParams.get('q') || undefined;
     const showDeleted = searchParams.get('showDeleted') === 'true';
     const sort = searchParams.get('sort') || 'updated';
+    const status = searchParams.get('status') || undefined;
+    const ownerId = searchParams.get('ownerId') || undefined;
+    const onlyUnassigned = searchParams.get('onlyUnassigned') === 'true';
     
     // Build where clause
     const where: Record<string, unknown> = {};
@@ -57,6 +60,21 @@ export async function GET(request: Request) {
       }
     }
     
+    // Filter by status
+    if (status) {
+      where.status = status;
+    }
+
+    // Filter by owner
+    if (ownerId) {
+      where.ownerId = ownerId;
+    }
+
+    // Only unassigned
+    if (onlyUnassigned) {
+      where.ownerId = null;
+    }
+
     // Text search in multiple fields
     if (q) {
       where.OR = [
@@ -278,5 +296,6 @@ scoreProbability =
     );
   }
 }
+
 
 
