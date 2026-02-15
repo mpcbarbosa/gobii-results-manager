@@ -86,7 +86,7 @@ export default function AdminLeadsPage() {
         <thead className="bg-gray-50">
           <tr>
             <th className="p-2 text-left">empresa</th>
-            <th className="p-2 text-left">domínio</th>
+            <th className="p-2 text-left">domÃ­nio</th>
             <th className="p-2 text-left">source</th>
             <th className="p-2 text-left">categoria</th>
             <th className="p-2 text-right">score</th>
