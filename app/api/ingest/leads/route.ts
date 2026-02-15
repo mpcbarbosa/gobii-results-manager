@@ -153,7 +153,26 @@ export async function POST(request: NextRequest) {
       }
       try {
         // Determine source: lead.source > request.source
-                const leadSourceKey = (leadInput as unknown as Record<string, unknown>)?.source?.key ?? (sourceInput as unknown as Record<string, unknown>)?.key;
+                        const leadSourceKey = (() => {
+          // lead-level source
+          const li: unknown = leadInput as unknown;
+          if (li && typeof li === 'object') {
+            const src = (li as Record<string, unknown>)['source'];
+            if (src && typeof src === 'object') {
+              const k = (src as Record<string, unknown>)['key'];
+              if (typeof k === 'string' && k.length > 0) return k;
+            }
+          }
+
+          // request-level source
+          const si: unknown = sourceInput as unknown;
+          if (si && typeof si === 'object') {
+            const k2 = (si as Record<string, unknown>)['key'];
+            if (typeof k2 === 'string' && k2.length > 0) return k2;
+          }
+
+          return null;
+        })();
         if (!leadSourceKey) {
           throw new Error('Source is required (provide source.key at request level OR per lead)');
         }
