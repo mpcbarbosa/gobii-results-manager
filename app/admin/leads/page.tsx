@@ -1,9 +1,10 @@
-"use client";
+﻿"use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 type Lead = {
+  status?: string | null;
   id: string;
   company: { name: string; domain?: string };
   source: string;
@@ -118,4 +119,5 @@ export default function AdminLeadsPage() {
     </div>
   );
 }
+
 

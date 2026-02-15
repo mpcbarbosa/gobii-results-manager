@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { requireAdminAuth } from "@/lib/adminAuth";
 import prisma from '@/lib/prisma';
 
@@ -244,6 +244,7 @@ scoreProbability =
       
       return {
         id: lead.id,
+        status: (lead.status ?? "NEW"),
         createdAt: lead.createdAt,
         updatedAt: lead.updatedAt,
         summary,
@@ -296,6 +297,7 @@ scoreProbability =
     );
   }
 }
+
 
 
 
