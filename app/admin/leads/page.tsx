@@ -141,7 +141,7 @@ export default function AdminLeadsPage() {
                         if (!me) return;
                         await patchLead(l.id, { owner: me });
                         await loadLeads();
-                      } catch (e: any) {
+                      } catch (e: unknown) {
                         alert(e?.message ?? "Erro a atribuir owner");
                       }
                     }}
@@ -156,7 +156,7 @@ export default function AdminLeadsPage() {
                       try {
                         await patchLead(l.id, { status: "QUALIFIED" });
                         await loadLeads();
-                      } catch (e: any) {
+                      } catch (e: unknown) {
                         alert(e?.message ?? "Erro a mudar status");
                       }
                     }}
@@ -171,7 +171,7 @@ export default function AdminLeadsPage() {
                       try {
                         await patchLead(l.id, { status: "CONTACTED" });
                         await loadLeads();
-                      } catch (e: any) {
+                      } catch (e: unknown) {
                         alert(e?.message ?? "Erro a mudar status");
                       }
                     }}
@@ -186,7 +186,7 @@ export default function AdminLeadsPage() {
                       try {
                         await patchLead(l.id, { status: "DISCARDED" });
                         await loadLeads();
-                      } catch (e: any) {
+                      } catch (e: unknown) {
                         alert(e?.message ?? "Erro a mudar status");
                       }
                     }}
@@ -211,6 +211,7 @@ export default function AdminLeadsPage() {
     </div>
   );
 }
+
 
 
 
