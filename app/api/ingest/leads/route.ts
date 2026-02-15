@@ -147,13 +147,13 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      const finalSourceKey = leadSourceKey ?? ((sourceInput as any)?.key ?? null);
+      const finalSourceKey = leadSourceKey ?? ((sourceInput as unknown as Record<string, unknown>)?.key ?? null);
       if (!finalSourceKey) {
         throw new Error('Source is required (provide source.key at request level OR per lead)');
       }
       try {
         // Determine source: lead.source > request.source
-                const leadSourceKey = (leadInput as any)?.source?.key ?? (sourceInput as any)?.key;
+                const leadSourceKey = (leadInput as unknown as Record<string, unknown>)?.source?.key ?? (sourceInput as unknown as Record<string, unknown>)?.key;
         if (!leadSourceKey) {
           throw new Error('Source is required (provide source.key at request level OR per lead)');
         }
