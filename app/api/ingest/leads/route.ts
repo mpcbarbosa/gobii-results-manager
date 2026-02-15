@@ -156,9 +156,9 @@ export async function POST(request: NextRequest) {
                 const leadSourceKey = (leadInput as any)?.source?.key ?? (sourceInput as any)?.key;
         if (!leadSourceKey) {
           throw new Error('Source is required (provide source.key at request level OR per lead)');
-        }const src = await getOrCreateSourceByKey(leadSource.key);
-        const result = await const src = await getOrCreateSourceByKey(finalSourceKey);
-      const result = await processLead(finalSourceKey, src.id, leadInput);
+        }
+        const src = await getOrCreateSourceByKey(leadSourceKey);
+        const result = await processLead(leadSourceKey, src.id, leadInput);
         results.ids.push(result.leadId);
         results.debug.push({ 
           leadId: result.leadId, 
