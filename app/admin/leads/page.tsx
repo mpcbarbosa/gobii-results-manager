@@ -70,7 +70,11 @@ export default function AdminLeadsPage() {
           value={q}
           onChange={e=>setQ(e.target.value)}
         />
-        <select value={sort} onChange={e=>setSort(e.target.value as any)} className="border px-3 py-1 rounded">
+        <select
+          value={sort}
+          onChange={e=>setSort(e.target.value as "new" | "score")}
+          className="border px-3 py-1 rounded"
+        >
           <option value="new">mais recentes</option>
           <option value="score">score desc</option>
         </select>
@@ -98,7 +102,10 @@ export default function AdminLeadsPage() {
               <td className="p-2">{l.lastSignalCategory ?? "-"}</td>
               <td className="p-2 text-right">{l.score ?? "-"}</td>
               <td className="p-2 text-right">
-                <Link href={/admin/leads/} className="underline">
+                <Link
+                  href={`/admin/leads/${l.id}`}
+                  className="underline"
+                >
                   detalhe
                 </Link>
               </td>
