@@ -47,6 +47,32 @@ export async function POST(request: NextRequest) {
   try {
     // Parse and validate request body
     const body = await request.json();
+        // Support per-lead source.key: if request-level source is missing, derive from first lead that has it
+    const rawLeadsUnknown = (body as unknown as { leads?: unknown }).leads;
+    const rawLeads = Array.isArray(rawLeadsUnknown) ? (rawLeadsUnknown as Array<unknown>) : [];
+
+    const bodyObj = body as unknown as Record<string, unknown>;
+    const existingSource = bodyObj["source"];
+    const existingKey =
+      (existingSource && typeof existingSource === "object")
+        ? (existingSource as Record<string, unknown>)["key"]
+        : null;
+
+    if (!(typeof existingKey === "string" && existingKey.length > 0)) {
+      for (const l of rawLeads) {
+        if (l && typeof l === "object") {
+          const src = (l as Record<string, unknown>)["source"];
+          if (src && typeof src === "object") {
+            const k = (src as Record<string, unknown>)["key"];
+            if (typeof k === "string" && k.length > 0) {
+              bodyObj["source"] = { key: k };
+              break;
+            }
+          }
+        }
+      }
+    }
+
     const validationResult = ingestBatchSchema.safeParse(body);
     
     if (!validationResult.success) {
@@ -108,14 +134,31 @@ export async function POST(request: NextRequest) {
       }>,
     };
     
-    for (const leadInput of leadsInput) {
+    for (let i = 0; i < leadsInput.length; i++) {
+      const leadInput = leadsInput[i];
+      const leadRaw = rawLeads[i];
+      let leadSourceKey: string | null = null;
+
+      if (leadRaw && typeof leadRaw === 'object') {
+        const src = (leadRaw as Record<string, unknown>)['source'];
+        if (src && typeof src === 'object') {
+          const k = (src as Record<string, unknown>)['key'];
+          if (typeof k === 'string' && k.length > 0) leadSourceKey = k;
+        }
+      }
+
+      const finalSourceKey = leadSourceKey ?? ((sourceInput as any)?.key ?? null);
+      if (!finalSourceKey) {
+        throw new Error('Source is required (provide source.key at request level OR per lead)');
+      }
       try {
         // Determine source: lead.source > request.source
                 const leadSourceKey = (leadInput as any)?.source?.key ?? (sourceInput as any)?.key;
         if (!leadSourceKey) {
           throw new Error('Source is required (provide source.key at request level OR per lead)');
         }const src = await getOrCreateSourceByKey(leadSource.key);
-        const result = await processLead(leadSource.key, src.id, leadInput);
+        const result = await const src = await getOrCreateSourceByKey(finalSourceKey);
+      const result = await processLead(finalSourceKey, src.id, leadInput);
         results.ids.push(result.leadId);
         results.debug.push({ 
           leadId: result.leadId, 
