@@ -21,7 +21,7 @@ async function patchLead(id: string, data: Record<string, unknown>) {
   });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j?.success) {
-    const msg = j?.error || j?.message || PATCH falhou ();
+    const msg = j?.error || j?.message || "PATCH falhou";
     throw new Error(msg);
   }
   return j;
@@ -211,6 +211,7 @@ export default function AdminLeadsPage() {
     </div>
   );
 }
+
 
 
 
