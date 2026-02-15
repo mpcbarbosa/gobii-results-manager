@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -86,7 +86,7 @@ export default function AdminLeadsPage() {
         <thead className="bg-gray-50">
           <tr>
             <th className="p-2 text-left">empresa</th>
-            <th className="p-2 text-left">domínio</th>
+            <th className="p-2 text-left">dom�nio</th>
             <th className="p-2 text-left">source</th>
             <th className="p-2 text-left">categoria</th>
             <th className="p-2 text-right">score</th>
@@ -100,7 +100,9 @@ export default function AdminLeadsPage() {
               <td className="p-2">{l.company?.domain ?? "-"}</td>
               <td className="p-2">{l.source}</td>
               <td className="p-2">{l.lastSignalCategory ?? "-"}</td>
-              <td className="p-2 text-right">{l.score ?? "-"}</td>
+              <td className="p-2 text-right">{l.score ?? "-"} </td>
+              <td className="p-2">{l.status ?? "NEW"}</td>
+              <td className="p-2">{l.owner ?? "-"}</td>
               <td className="p-2 text-right">
                 <Link
                   href={`/admin/leads/${l.id}`}
@@ -116,3 +118,4 @@ export default function AdminLeadsPage() {
     </div>
   );
 }
+
