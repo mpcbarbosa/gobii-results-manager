@@ -1,5 +1,31 @@
 ﻿"use client";
 
+
+
+function getMyOwner(): string {
+  if (typeof window === "undefined") return "";
+  const k = "gobii_owner";
+  const existing = window.localStorage.getItem(k);
+  if (existing && existing.trim() !== "") return existing;
+  const v = window.prompt("Define o teu owner (ex: email ou nome curto) para atribuição de leads:", "") || "";
+  const vv = v.trim();
+  if (vv) window.localStorage.setItem(k, vv);
+  return vv;
+}
+
+async function patchLead(id: string, data: Record<string, unknown>) {
+  const r = await fetch(/api/admin/leads/, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok || !j?.success) {
+    const msg = j?.error || j?.message || PATCH falhou ();
+    throw new Error(msg);
+  }
+  return j;
+}
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
@@ -105,7 +131,72 @@ export default function AdminLeadsPage() {
               <td className="p-2 text-right">{l.score ?? "-"} </td>
               <td className="p-2">{l.status ?? "NEW"}</td>
               <td className="p-2">{l.owner ?? "-"}</td>
-              <td className="p-2 text-right">
+                            <td className="p-2">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    className="border px-2 py-1 rounded"
+                    onClick={async () => {
+                      try {
+                        const me = getMyOwner();
+                        if (!me) return;
+                        await patchLead(l.id, { owner: me });
+                        await loadLeads();
+                      } catch (e: any) {
+                        alert(e?.message ?? "Erro a atribuir owner");
+                      }
+                    }}
+                    title="Atribuir a mim"
+                  >
+                    assumir
+                  </button>
+
+                  <button
+                    className="border px-2 py-1 rounded"
+                    onClick={async () => {
+                      try {
+                        await patchLead(l.id, { status: "QUALIFIED" });
+                        await loadLeads();
+                      } catch (e: any) {
+                        alert(e?.message ?? "Erro a mudar status");
+                      }
+                    }}
+                    title="Marcar como qualificado"
+                  >
+                    qualificar
+                  </button>
+
+                  <button
+                    className="border px-2 py-1 rounded"
+                    onClick={async () => {
+                      try {
+                        await patchLead(l.id, { status: "CONTACTED" });
+                        await loadLeads();
+                      } catch (e: any) {
+                        alert(e?.message ?? "Erro a mudar status");
+                      }
+                    }}
+                    title="Marcar como contactado"
+                  >
+                    contactado
+                  </button>
+
+                  <button
+                    className="border px-2 py-1 rounded"
+                    onClick={async () => {
+                      try {
+                        await patchLead(l.id, { status: "DISCARDED" });
+                        await loadLeads();
+                      } catch (e: any) {
+                        alert(e?.message ?? "Erro a mudar status");
+                      }
+                    }}
+                    title="Descartar lead"
+                  >
+                    descartar
+                  </button>
+                </div>
+              </td>
+<td className="p-2 text-right">
                 <Link
                   href={`/admin/leads/${l.id}`}
                   className="underline"
@@ -120,6 +211,7 @@ export default function AdminLeadsPage() {
     </div>
   );
 }
+
 
 
 
