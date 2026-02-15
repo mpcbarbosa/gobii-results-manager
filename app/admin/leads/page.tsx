@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 type Lead = {
+  owner?: string | null;
   status?: string | null;
   id: string;
   company: { name: string; domain?: string };
@@ -119,5 +120,6 @@ export default function AdminLeadsPage() {
     </div>
   );
 }
+
 
 
