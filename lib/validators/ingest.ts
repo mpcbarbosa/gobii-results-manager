@@ -1,4 +1,4 @@
-import { z } from 'zod';
+﻿import { z } from 'zod';
 
 // Source schema - accepts string or object
 export const sourceSchema = z.union([
@@ -38,6 +38,7 @@ export const contactSchema = z.object({
 // Lead schema
 export const leadSchema = z.object({
   external_id: z.string().optional(),
+  description: z.string().optional().nullable(),
   source: z.union([
     z.string().min(1),
     z.object({ key: z.string().min(1) }),
@@ -69,3 +70,4 @@ export type LeadInput = z.infer<typeof leadSchema>;
 export type CompanyInput = z.infer<typeof companySchema>;
 export type ContactInput = z.infer<typeof contactSchema>;
 export type SourceInput = z.infer<typeof sourceSchema>;
+
