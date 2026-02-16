@@ -456,40 +456,43 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
     probability_value: leadInput.probability,
   } : undefined;
   
-    // Build enriched data (preserve existing values when not provided)
-  const descIncoming =
-    (leadInput.description !== undefined)
-      ? pickText(leadInput.description)
-      : undefined;
+    // Build enriched data for CREATE (all fields, nulls ok)
+  const descForCreate = pickText(leadInput.description);
+  const sumForCreate = pickText(leadInput.summary, descForCreate);
 
-  const sumIncoming =
-    (leadInput.summary !== undefined)
-      ? pickText(leadInput.summary, descIncoming ?? pickText(leadInput.description))
-      : undefined;
+  const enrichedDataCreate = {
+    summary: sumForCreate ?? null,
+    description: descForCreate ?? null,
+    trigger: leadInput.trigger ?? null,
+    external_id: leadInput.external_id ?? null,
+  };
 
+  // Build enriched data for UPDATE (merge with existing, only overwrite when provided)
+  // Test case: 1st ingest with summary/description → 2nd ingest without → must keep existing
   const existingEnriched = (existingLead?.enrichedData ?? {}) as Record<string, unknown>;
 
-  const enrichedData = {
-    summary:
-      (leadInput.summary !== undefined)
-        ? (sumIncoming ?? null)
-        : ((existingEnriched.summary as string | null) ?? null),
-
-    description:
-      (leadInput.description !== undefined)
-        ? (descIncoming ?? null)
-        : ((existingEnriched.description as string | null) ?? null),
-
-    trigger:
-      (leadInput.trigger !== undefined)
-        ? (leadInput.trigger ?? null)
-        : ((existingEnriched.trigger as string | null) ?? null),
-
-    external_id:
-      (leadInput.external_id !== undefined)
-        ? (leadInput.external_id ?? null)
-        : ((existingEnriched.external_id as string | null) ?? null),
+  const enrichedDataUpdate: Record<string, unknown> = {
+    // Always preserve existing values as base
+    summary: existingEnriched.summary ?? null,
+    description: existingEnriched.description ?? null,
+    trigger: existingEnriched.trigger ?? null,
+    external_id: existingEnriched.external_id ?? null,
   };
+
+  // Only overwrite fields that are explicitly provided in the payload
+  if (leadInput.summary !== undefined) {
+    enrichedDataUpdate.summary = pickText(leadInput.summary, pickText(leadInput.description)) ?? null;
+  }
+  if (leadInput.description !== undefined) {
+    enrichedDataUpdate.description = pickText(leadInput.description) ?? null;
+  }
+  if (leadInput.trigger !== undefined) {
+    enrichedDataUpdate.trigger = leadInput.trigger ?? null;
+  }
+  if (leadInput.external_id !== undefined) {
+    enrichedDataUpdate.external_id = leadInput.external_id ?? null;
+  }
+
 // Upsert Lead
   const now = new Date();
   const lead = await prisma.lead.upsert({
@@ -499,7 +502,7 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
       score: leadInput.score_final !== undefined ? leadInput.score_final : undefined,
       scoreDetails: scoreDetails || undefined,
       rawData: leadInput.raw || undefined,
-      enrichedData,
+      enrichedData: enrichedDataUpdate as Record<string, string | null>,
       // Increment seen count and update last seen
       seenCount: existingLead ? existingLead.seenCount + 1 : 1,
       lastSeenAt: now,
@@ -514,7 +517,7 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
       status: LeadStatus.NEW,
       priority: leadInput.score_final ? Math.round(leadInput.score_final / 10) : 0,
       rawData: leadInput.raw,
-      enrichedData,
+      enrichedData: enrichedDataCreate,
       seenCount: 1,
       lastSeenAt: now,
     },
