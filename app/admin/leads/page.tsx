@@ -14,7 +14,7 @@ function getMyOwner(): string {
 }
 
 async function patchLead(id: string, data: Record<string, unknown>) {
-  const r = await fetch("/api/admin/leads/", {
+  const r = await fetch(`/api/admin/leads/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
@@ -211,6 +211,7 @@ export default function AdminLeadsPage() {
     </div>
   );
 }
+
 
 
 
