@@ -6,7 +6,6 @@ import { normalizeCompanyName, normalizeEmail } from '@/lib/utils/normalize';
 import { generateDomainSuggestionFromLeadData, isInvalidDomain } from '@/lib/utils/domain-suggestion';
 import { LeadStatus } from '@prisma/client';
 import { recordIngestAudit } from '@/lib/crm/auditIngest';
-
 // Authentication middleware
 function authenticate(request: NextRequest): { success: boolean; error?: string; status?: number } {
   const authHeader = request.headers.get('authorization');
@@ -33,7 +32,6 @@ function authenticate(request: NextRequest): { success: boolean; error?: string;
   
   return { success: false, error: 'Unauthorized', status: 401 };
 }
-
 export async function POST(request: NextRequest) {
   // Authenticate
   const authResult = authenticate(request);
@@ -50,15 +48,13 @@ export async function POST(request: NextRequest) {
         // Support per-lead source.key: if request-level source is missing, derive from first lead that has it
     const rawLeadsUnknown = (body as unknown as { leads?: unknown }).leads;
     const rawLeads = Array.isArray(rawLeadsUnknown) ? (rawLeadsUnknown as Array<unknown>) : [];
-
-    const bodyObj = body as unknown as Record<string, unknown>;
+const bodyObj = body as unknown as Record<string, unknown>;
     const existingSource = bodyObj["source"];
     const existingKey =
       (existingSource && typeof existingSource === "object")
         ? (existingSource as Record<string, unknown>)["key"]
         : null;
-
-    if (!(typeof existingKey === "string" && existingKey.length > 0)) {
+if (!(typeof existingKey === "string" && existingKey.length > 0)) {
       for (const l of rawLeads) {
         if (l && typeof l === "object") {
           const src = (l as Record<string, unknown>)["source"];
@@ -72,8 +68,7 @@ export async function POST(request: NextRequest) {
         }
       }
     }
-
-    const validationResult = ingestBatchSchema.safeParse(body);
+const validationResult = ingestBatchSchema.safeParse(body);
     
     if (!validationResult.success) {
       return NextResponse.json(
@@ -100,23 +95,18 @@ export async function POST(request: NextRequest) {
     // Cache de sources por nome (key) para suportar payloads multi-source no mesmo request
     const sourceCache = new Map<string, { id: string; name: string; type: string }>();
     sourceCache.set(sourceInput.key, _source);
-
-    async function getOrCreateSourceByKey(key: string) {
+async function getOrCreateSourceByKey(key: string) {
       const cached = sourceCache.get(key);
       if (cached) return cached;
-
-      const s = await prisma.source.upsert({
+const s = await prisma.source.upsert({
         where: { name: key },
         update: {},
         create: { name: key, type: 'scanner' },
       });
-
-      sourceCache.set(key, s);
+sourceCache.set(key, s);
       return s;
     }
-
-    
-    // Process leads
+// Process leads
     const results = {
       created: 0,
       updated: 0,
@@ -138,16 +128,14 @@ export async function POST(request: NextRequest) {
       const leadInput = leadsInput[i];
       const leadRaw = rawLeads[i];
       let leadSourceKey: string | null = null;
-
-      if (leadRaw && typeof leadRaw === 'object') {
+if (leadRaw && typeof leadRaw === 'object') {
         const src = (leadRaw as Record<string, unknown>)['source'];
         if (src && typeof src === 'object') {
           const k = (src as Record<string, unknown>)['key'];
           if (typeof k === 'string' && k.length > 0) leadSourceKey = k;
         }
       }
-
-      const finalSourceKey = leadSourceKey ?? ((sourceInput as unknown as Record<string, unknown>)?.key ?? null);
+const finalSourceKey = leadSourceKey ?? ((sourceInput as unknown as Record<string, unknown>)?.key ?? null);
       if (!finalSourceKey) {
         throw new Error('Source is required (provide source.key at request level OR per lead)');
       }
@@ -163,15 +151,13 @@ export async function POST(request: NextRequest) {
               if (typeof k === 'string' && k.length > 0) return k;
             }
           }
-
-          // request-level source
+// request-level source
           const si: unknown = sourceInput as unknown;
           if (si && typeof si === 'object') {
             const k2 = (si as Record<string, unknown>)['key'];
             if (typeof k2 === 'string' && k2.length > 0) return k2;
           }
-
-          return null;
+return null;
         })();
         if (!leadSourceKey) {
           throw new Error('Source is required (provide source.key at request level OR per lead)');
@@ -214,8 +200,7 @@ export async function POST(request: NextRequest) {
       skipped: results.skipped,
       meta: { sourceKey: sourceInput.key, sampleIds: results.ids.slice(0, 3) },
     });
-
-    return NextResponse.json({
+return NextResponse.json({
       success: true,
       counts: {
         created: results.created,
@@ -236,8 +221,7 @@ export async function POST(request: NextRequest) {
       status: "ERROR",
       errorMessage: error instanceof Error ? error.message : "Unknown error",
     });
-
-    return NextResponse.json(
+return NextResponse.json(
       {
         error: 'Internal server error',
         message: error instanceof Error ? error.message : 'Unknown error',
@@ -246,7 +230,6 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
 async function processLead(sourceKey: string, sourceId: string, leadInput: LeadInput): Promise<{ 
   leadId: string; 
   isNew: boolean; 
@@ -472,11 +455,14 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
   } : undefined;
   
   // Build enriched data
-  const enrichedData = {
-    summary: leadInput.summary,
-    trigger: leadInput.trigger,
-    external_id: leadInput.external_id,
-  };
+  const desc = pickText((leadInput as Record<string, unknown>)["description"]);
+
+const enrichedData = {
+  summary: pickText(leadInput.summary, desc),
+  description: desc,
+  trigger: leadInput.trigger,
+  external_id: leadInput.external_id,
+};
   
   // Upsert Lead
   const now = new Date();
@@ -569,3 +555,13 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
     domainAutofillReason: domainUpdateReason || 'none',
   };
 }
+
+function pickText(...vals: unknown[]): string | undefined {
+  for (const v of vals) {
+    if (typeof v === "string" && v.trim() !== "") return v;
+  }
+  return undefined;
+}
+
+
+
