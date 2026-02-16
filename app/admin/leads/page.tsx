@@ -140,9 +140,9 @@ export default function AdminLeadsPage() {
                         const me = getMyOwner();
                         if (!me) return;
                         await patchLead(l.id, { owner: me });
-                        await fetchLeads();
+                        await load();
                       } catch (e: unknown) {
-                        alert(e?.message ?? "Erro a atribuir owner");
+                        alert(((e instanceof Error) ? e.message : String(e)) ?? "Erro a atribuir owner");
                       }
                     }}
                     title="Atribuir a mim"
@@ -155,9 +155,9 @@ export default function AdminLeadsPage() {
                     onClick={async () => {
                       try {
                         await patchLead(l.id, { status: "QUALIFIED" });
-                        await fetchLeads();
+                        await load();
                       } catch (e: unknown) {
-                        alert(e?.message ?? "Erro a mudar status");
+                        alert(((e instanceof Error) ? e.message : String(e)) ?? "Erro a mudar status");
                       }
                     }}
                     title="Marcar como qualificado"
@@ -170,9 +170,9 @@ export default function AdminLeadsPage() {
                     onClick={async () => {
                       try {
                         await patchLead(l.id, { status: "CONTACTED" });
-                        await fetchLeads();
+                        await load();
                       } catch (e: unknown) {
-                        alert(e?.message ?? "Erro a mudar status");
+                        alert(((e instanceof Error) ? e.message : String(e)) ?? "Erro a mudar status");
                       }
                     }}
                     title="Marcar como contactado"
@@ -185,9 +185,9 @@ export default function AdminLeadsPage() {
                     onClick={async () => {
                       try {
                         await patchLead(l.id, { status: "DISCARDED" });
-                        await fetchLeads();
+                        await load();
                       } catch (e: unknown) {
-                        alert(e?.message ?? "Erro a mudar status");
+                        alert(((e instanceof Error) ? e.message : String(e)) ?? "Erro a mudar status");
                       }
                     }}
                     title="Descartar lead"
@@ -211,6 +211,9 @@ export default function AdminLeadsPage() {
     </div>
   );
 }
+
+
+
 
 
 
