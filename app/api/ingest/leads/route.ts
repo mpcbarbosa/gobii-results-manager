@@ -455,13 +455,23 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
   } : undefined;
   
   // Build enriched data
-  const desc = pickText((leadInput as Record<string, unknown>)["description"]);
+const leadRec = leadInput as unknown as Record<string, unknown>;
+const desc =
+  (typeof leadRec["description"] === "string" && (leadRec["description"] as string).trim() !== "")
+    ? (leadRec["description"] as string)
+    : undefined;
 
+const sum = pickText(
+  leadInput.summary,
+  desc
+);
+
+// Prisma Json não aceita `undefined` dentro do objeto -> usar null
 const enrichedData = {
-  summary: pickText(leadInput.summary, desc),
-  description: desc,
-  trigger: leadInput.trigger,
-  external_id: leadInput.external_id,
+  summary: sum ?? null,
+  description: desc ?? null,
+  trigger: leadInput.trigger ?? null,
+  external_id: leadInput.external_id ?? null,
 };
   
   // Upsert Lead
@@ -562,6 +572,7 @@ function pickText(...vals: unknown[]): string | undefined {
   }
   return undefined;
 }
+
 
 
 
