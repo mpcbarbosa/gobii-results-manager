@@ -269,13 +269,15 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
     }
   }
   
-  // Generate dedupe key
+  // Generate dedupe key (1 lead per company per country)
+  const companyKey =
+    (normalizedDomain && !isInvalidDomain(normalizedDomain))
+      ? normalizedDomain
+      : companyNameNormalized;
+
   const dedupeKey = generateDedupeKey({
-    sourceKey,
-    companyName: leadInput.company.name,
+    companyKey,
     country: leadInput.company.country,
-    contactEmail: leadInput.contact?.email,
-    trigger: leadInput.trigger || 'no-trigger',
   });
   
   // Find or create Account with improved deduplication
@@ -454,16 +456,39 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
     probability_value: leadInput.probability,
   } : undefined;
   
-    // Build enriched data
-  const desc = pickText(leadInput.description);
-  const sum = pickText(leadInput.summary, desc);
+    // Build enriched data (preserve existing values when not provided)
+  const descIncoming =
+    (leadInput.description !== undefined)
+      ? pickText(leadInput.description)
+      : undefined;
 
-  // Prisma Json não aceita `undefined` dentro do objeto -> usar null
+  const sumIncoming =
+    (leadInput.summary !== undefined)
+      ? pickText(leadInput.summary, descIncoming ?? pickText(leadInput.description))
+      : undefined;
+
+  const existingEnriched = (existingLead?.enrichedData ?? {}) as Record<string, unknown>;
+
   const enrichedData = {
-    summary: sum ?? null,
-    description: desc ?? null,
-    trigger: leadInput.trigger ?? null,
-    external_id: leadInput.external_id ?? null,
+    summary:
+      (leadInput.summary !== undefined)
+        ? (sumIncoming ?? null)
+        : ((existingEnriched.summary as string | null) ?? null),
+
+    description:
+      (leadInput.description !== undefined)
+        ? (descIncoming ?? null)
+        : ((existingEnriched.description as string | null) ?? null),
+
+    trigger:
+      (leadInput.trigger !== undefined)
+        ? (leadInput.trigger ?? null)
+        : ((existingEnriched.trigger as string | null) ?? null),
+
+    external_id:
+      (leadInput.external_id !== undefined)
+        ? (leadInput.external_id ?? null)
+        : ((existingEnriched.external_id as string | null) ?? null),
   };
 // Upsert Lead
   const now = new Date();
