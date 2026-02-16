@@ -454,27 +454,18 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
     probability_value: leadInput.probability,
   } : undefined;
   
-  // Build enriched data
-const leadRec = leadInput as unknown as Record<string, unknown>;
-const desc =
-  (typeof leadRec["description"] === "string" && (leadRec["description"] as string).trim() !== "")
-    ? (leadRec["description"] as string)
-    : undefined;
+    // Build enriched data
+  const desc = pickText(leadInput.description);
+  const sum = pickText(leadInput.summary, desc);
 
-const sum = pickText(
-  leadInput.summary,
-  desc
-);
-
-// Prisma Json não aceita `undefined` dentro do objeto -> usar null
-const enrichedData = {
-  summary: sum ?? null,
-  description: desc ?? null,
-  trigger: leadInput.trigger ?? null,
-  external_id: leadInput.external_id ?? null,
-};
-  
-  // Upsert Lead
+  // Prisma Json não aceita `undefined` dentro do objeto -> usar null
+  const enrichedData = {
+    summary: sum ?? null,
+    description: desc ?? null,
+    trigger: leadInput.trigger ?? null,
+    external_id: leadInput.external_id ?? null,
+  };
+// Upsert Lead
   const now = new Date();
   const lead = await prisma.lead.upsert({
     where: { dedupeKey },
@@ -572,6 +563,7 @@ function pickText(...vals: unknown[]): string | undefined {
   }
   return undefined;
 }
+
 
 
 
