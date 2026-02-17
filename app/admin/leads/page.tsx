@@ -31,6 +31,9 @@ import Link from "next/link";
 
 type Lead = {
   owner?: string | null;
+  ownerId?: string | null;
+  ownerName?: string | null;
+  ownerEmail?: string | null;
   status?: string | null;
   id: string;
   company: { name: string; domain?: string };
@@ -141,7 +144,7 @@ export default function AdminLeadsPage() {
                   {l.status ?? "NEW"}
                 </span>
               </td>
-              <td className="p-2 text-sm text-gray-600">{l.owner ?? "-"}</td>
+              <td className="p-2 text-sm text-gray-600">{l.ownerName ?? l.ownerEmail ?? l.owner ?? "-"}</td>
               <td className="p-2 text-right">
                 <Link
                   href={`/admin/leads/${l.id}`}
