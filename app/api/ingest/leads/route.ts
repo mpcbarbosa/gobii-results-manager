@@ -456,42 +456,33 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
     probability_value: leadInput.probability,
   } : undefined;
   
-    // Build enriched data for CREATE (all fields, nulls ok)
-  const descForCreate = pickText(leadInput.description);
-  const sumForCreate = pickText(leadInput.summary, descForCreate);
+    // Determine which fields are explicitly provided
+  const hasDesc = typeof leadInput.description !== 'undefined';
+  const hasSum = typeof leadInput.summary !== 'undefined';
 
+  const desc = pickText(leadInput.description);
+  const sum = pickText(leadInput.summary, desc);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const existingEnriched = (existingLead?.enrichedData ?? {}) as any;
+
+  // CREATE: all fields, nulls ok
   const enrichedDataCreate = {
-    summary: sumForCreate ?? null,
-    description: descForCreate ?? null,
+    summary: sum ?? null,
+    description: desc ?? null,
     trigger: leadInput.trigger ?? null,
     external_id: leadInput.external_id ?? null,
   };
 
-  // Build enriched data for UPDATE (merge with existing, only overwrite when provided)
-  // Test case: 1st ingest with summary/description → 2nd ingest without → must keep existing
-  const existingEnriched = (existingLead?.enrichedData ?? {}) as Record<string, unknown>;
-
-  const enrichedDataUpdate: Record<string, unknown> = {
-    // Always preserve existing values as base
-    summary: existingEnriched.summary ?? null,
-    description: existingEnriched.description ?? null,
-    trigger: existingEnriched.trigger ?? null,
-    external_id: existingEnriched.external_id ?? null,
+  // UPDATE: merge with existing — only overwrite when explicitly provided
+  // Acceptance test: baseline summary="BASE_SUM" → update without summary → must remain "BASE_SUM"
+  const enrichedDataUpdate = {
+    ...existingEnriched,
+    ...(hasDesc ? { description: desc ?? null } : {}),
+    ...(hasSum || hasDesc ? { summary: sum ?? null } : {}),
+    trigger: leadInput.trigger ?? existingEnriched.trigger ?? null,
+    external_id: leadInput.external_id ?? existingEnriched.external_id ?? null,
   };
-
-  // Only overwrite fields that are explicitly provided in the payload
-  if (leadInput.summary !== undefined) {
-    enrichedDataUpdate.summary = pickText(leadInput.summary, pickText(leadInput.description)) ?? null;
-  }
-  if (leadInput.description !== undefined) {
-    enrichedDataUpdate.description = pickText(leadInput.description) ?? null;
-  }
-  if (leadInput.trigger !== undefined) {
-    enrichedDataUpdate.trigger = leadInput.trigger ?? null;
-  }
-  if (leadInput.external_id !== undefined) {
-    enrichedDataUpdate.external_id = leadInput.external_id ?? null;
-  }
 
 // Upsert Lead
   const now = new Date();
@@ -502,7 +493,7 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
       score: leadInput.score_final !== undefined ? leadInput.score_final : undefined,
       scoreDetails: scoreDetails || undefined,
       rawData: leadInput.raw || undefined,
-      enrichedData: enrichedDataUpdate as Record<string, string | null>,
+      enrichedData: enrichedDataUpdate,
       // Increment seen count and update last seen
       seenCount: existingLead ? existingLead.seenCount + 1 : 1,
       lastSeenAt: now,
