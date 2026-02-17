@@ -163,7 +163,7 @@ return null;
           throw new Error('Source is required (provide source.key at request level OR per lead)');
         }
         const src = await getOrCreateSourceByKey(leadSourceKey);
-        const result = await processLead(leadSourceKey, src.id, leadInput);
+        const result = await processLead(leadSourceKey, src.id, leadInput, leadRaw);
         results.ids.push(result.leadId);
         results.debug.push({ 
           leadId: result.leadId, 
@@ -230,7 +230,7 @@ return NextResponse.json(
     );
   }
 }
-async function processLead(sourceKey: string, sourceId: string, leadInput: LeadInput): Promise<{ 
+async function processLead(sourceKey: string, sourceId: string, leadInput: LeadInput, leadRaw: unknown): Promise<{
   leadId: string; 
   isNew: boolean; 
   domainAutofilled: boolean; 
@@ -456,9 +456,13 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
     probability_value: leadInput.probability,
   } : undefined;
   
-    // Determine which fields are explicitly provided
-  const hasDesc = typeof leadInput.description !== 'undefined';
-  const hasSum = typeof leadInput.summary !== 'undefined';
+    // Determine which fields are explicitly provided in the RAW payload (before Zod)
+  // Zod .optional() includes keys with value undefined, so we check the raw JSON object
+  const rawObj = (leadRaw && typeof leadRaw === 'object') ? leadRaw as Record<string, unknown> : {};
+  const hasSumKey = 'summary' in rawObj;
+  const hasDescKey = 'description' in rawObj;
+  const hasTriggerKey = 'trigger' in rawObj;
+  const hasExtIdKey = 'external_id' in rawObj;
 
   const desc = pickText(leadInput.description);
   const sum = pickText(leadInput.summary, desc);
@@ -474,14 +478,14 @@ async function processLead(sourceKey: string, sourceId: string, leadInput: LeadI
     external_id: leadInput.external_id ?? null,
   };
 
-  // UPDATE: merge with existing — only overwrite when explicitly provided
-  // Acceptance test: baseline summary="BASE_SUM" → update without summary → must remain "BASE_SUM"
+  // UPDATE: merge with existing — only overwrite when key was explicitly in the raw payload
+  // Acceptance test: baseline summary="BASE_SUM" → update without summary key → must remain "BASE_SUM"
   const enrichedDataUpdate = {
     ...existingEnriched,
-    ...(hasDesc ? { description: desc ?? null } : {}),
-    ...(hasSum || hasDesc ? { summary: sum ?? null } : {}),
-    trigger: leadInput.trigger ?? existingEnriched.trigger ?? null,
-    external_id: leadInput.external_id ?? existingEnriched.external_id ?? null,
+    ...(hasDescKey ? { description: desc ?? null } : {}),
+    ...(hasSumKey || hasDescKey ? { summary: sum ?? null } : {}),
+    ...(hasTriggerKey ? { trigger: leadInput.trigger ?? null } : {}),
+    ...(hasExtIdKey ? { external_id: leadInput.external_id ?? null } : {}),
   };
 
 // Upsert Lead
