@@ -48,6 +48,14 @@ enum LeadStatus {
   ARCHIVED        // No longer active
 }
 
+enum LeadStage {
+  NEW             // Initial / unprocessed
+  ASSUMED         // Assumed by a commercial user
+  QUALIFIED       // Qualified as opportunity
+  CONTACTED       // Contact made
+  DISCARDED       // Discarded / not viable
+}
+
 enum ActivityType {
   NOTE            // General note
   CALL            // Phone call
@@ -199,6 +207,12 @@ model Lead {
   seenCount         Int       @default(1) @map("seen_count") // Number of times lead appeared
   lastSeenAt        DateTime? @map("last_seen_at") // Last time lead was seen/updated
   
+  // Commercial pipeline
+  stage             LeadStage @default(NEW) @map("stage")
+  ownerAssignedAt   DateTime? @map("owner_assigned_at")
+  discardedAt       DateTime? @map("discarded_at")
+  discardReason     String?   @map("discard_reason") @db.Text
+
   // Soft delete
   deletedAt         DateTime? @map("deleted_at")
   
