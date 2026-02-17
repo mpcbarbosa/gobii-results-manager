@@ -2,7 +2,7 @@
 
 
 
-function getMyOwner(): string {
+function _getMyOwner(): string {
   if (typeof window === "undefined") return "";
   const k = "gobii_owner";
   const existing = window.localStorage.getItem(k);
@@ -13,7 +13,7 @@ function getMyOwner(): string {
   return vv;
 }
 
-async function patchLead(id: string, data: Record<string, unknown>) {
+async function _patchLead(id: string, data: Record<string, unknown>) {
   const r = await fetch(`/api/admin/leads/${id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -118,88 +118,34 @@ export default function AdminLeadsPage() {
             <th className="p-2 text-left">source</th>
             <th className="p-2 text-left">categoria</th>
             <th className="p-2 text-right">score</th>
+            <th className="p-2 text-left">status</th>
+            <th className="p-2 text-left">owner</th>
             <th className="p-2 text-right"></th>
           </tr>
         </thead>
         <tbody>
           {sorted.map(l=>(
-            <tr key={l.id} className="border-t">
+            <tr key={l.id} className="border-t hover:bg-gray-50">
               <td className="p-2">{l.company?.name}</td>
               <td className="p-2">{l.company?.domain ?? "-"}</td>
               <td className="p-2">{l.source}</td>
               <td className="p-2">{l.lastSignalCategory ?? "-"}</td>
-              <td className="p-2 text-right">{l.score ?? "-"} </td>
-              <td className="p-2">{l.status ?? "NEW"}</td>
-              <td className="p-2">{l.owner ?? "-"}</td>
-                            <td className="p-2">
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    className="border px-2 py-1 rounded"
-                    onClick={async () => {
-                      try {
-                        const me = getMyOwner();
-                        if (!me) return;
-                        await patchLead(l.id, { owner: me });
-                        await load();
-                      } catch (e: unknown) {
-                        alert(((e instanceof Error) ? e.message : String(e)) ?? "Erro a atribuir owner");
-                      }
-                    }}
-                    title="Atribuir a mim"
-                  >
-                    assumir
-                  </button>
-
-                  <button
-                    className="border px-2 py-1 rounded"
-                    onClick={async () => {
-                      try {
-                        await patchLead(l.id, { status: "QUALIFIED" });
-                        await load();
-                      } catch (e: unknown) {
-                        alert(((e instanceof Error) ? e.message : String(e)) ?? "Erro a mudar status");
-                      }
-                    }}
-                    title="Marcar como qualificado"
-                  >
-                    qualificar
-                  </button>
-
-                  <button
-                    className="border px-2 py-1 rounded"
-                    onClick={async () => {
-                      try {
-                        await patchLead(l.id, { status: "CONTACTED" });
-                        await load();
-                      } catch (e: unknown) {
-                        alert(((e instanceof Error) ? e.message : String(e)) ?? "Erro a mudar status");
-                      }
-                    }}
-                    title="Marcar como contactado"
-                  >
-                    contactado
-                  </button>
-
-                  <button
-                    className="border px-2 py-1 rounded"
-                    onClick={async () => {
-                      try {
-                        await patchLead(l.id, { status: "DISCARDED" });
-                        await load();
-                      } catch (e: unknown) {
-                        alert(((e instanceof Error) ? e.message : String(e)) ?? "Erro a mudar status");
-                      }
-                    }}
-                    title="Descartar lead"
-                  >
-                    descartar
-                  </button>
-                </div>
+              <td className="p-2 text-right">{l.score ?? "-"}</td>
+              <td className="p-2">
+                <span className={`inline-block px-2 py-0.5 text-xs rounded-full ${
+                  l.status === 'QUALIFIED' ? 'bg-green-100 text-green-800' :
+                  l.status === 'CONTACTED' ? 'bg-purple-100 text-purple-800' :
+                  l.status === 'DISCARDED' ? 'bg-gray-100 text-gray-600' :
+                  'bg-blue-100 text-blue-800'
+                }`}>
+                  {l.status ?? "NEW"}
+                </span>
               </td>
-<td className="p-2 text-right">
+              <td className="p-2 text-sm text-gray-600">{l.owner ?? "-"}</td>
+              <td className="p-2 text-right">
                 <Link
                   href={`/admin/leads/${l.id}`}
-                  className="underline"
+                  className="text-blue-600 hover:text-blue-800 underline text-sm"
                 >
                   detalhe
                 </Link>
