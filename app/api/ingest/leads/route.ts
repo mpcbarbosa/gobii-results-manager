@@ -116,12 +116,7 @@ sourceCache.set(key, s);
         applied: 0,
         skipped: 0,
       },
-      debug: [] as Array<{ 
-        leadId: string; 
-        accountMatchedBy: string;
-        domainAutofillAction: string;
-        domainAutofillReason: string;
-      }>,
+      debug: [] as Array<Record<string, unknown>>,
     };
     
     for (let i = 0; i < leadsInput.length; i++) {
@@ -165,12 +160,24 @@ return null;
         const src = await getOrCreateSourceByKey(leadSourceKey);
         const result = await processLead(leadSourceKey, src.id, leadInput, leadRaw);
         results.ids.push(result.leadId);
-        results.debug.push({ 
-          leadId: result.leadId, 
+
+        // Debug info (controlled by INGEST_DEBUG env var)
+        const debugEntry: Record<string, unknown> = {
+          leadId: result.leadId,
           accountMatchedBy: result.accountMatchedBy,
           domainAutofillAction: result.domainAutofillAction,
           domainAutofillReason: result.domainAutofillReason,
-        });
+        };
+        if (process.env.INGEST_DEBUG === '1') {
+          const rawObj = (leadRaw && typeof leadRaw === 'object') ? leadRaw as Record<string, unknown> : {};
+          debugEntry.rawKeys = Object.keys(rawObj);
+          debugEntry.hasSumKey = 'summary' in rawObj;
+          debugEntry.hasDescKey = 'description' in rawObj;
+          debugEntry.hasTriggerKey = 'trigger' in rawObj;
+          debugEntry.hasExtIdKey = 'external_id' in rawObj;
+          debugEntry.isNew = result.isNew;
+        }
+        results.debug.push(debugEntry);
         if (result.isNew) {
           results.created++;
         } else {
