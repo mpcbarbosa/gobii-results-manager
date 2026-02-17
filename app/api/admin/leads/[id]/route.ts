@@ -101,6 +101,13 @@ return NextResponse.json(
             createdAt: true,
           },
         },
+        leadChanges: {
+          orderBy: { changedAt: "desc" },
+          take: 50,
+          include: {
+            changedByUser: { select: { id: true, name: true, email: true } },
+          },
+        },
       },
     });
     
@@ -223,6 +230,15 @@ if (!signal.lastSignalCategory) {
           lastSignalSourceUrl: signal.lastSignalSourceUrl,
           lastSignalConfidence: signal.lastSignalConfidence,
         },
+        changes: lead.leadChanges?.map((c: Record<string, unknown>) => ({
+          id: c.id,
+          changedAt: c.changedAt,
+          field: c.field,
+          from: c.fromValue,
+          to: c.toValue,
+          reason: c.reason,
+          actor: c.changedByUser ? (c.changedByUser as Record<string, unknown>).name : null,
+        })) ?? [],
       },
     });
     
