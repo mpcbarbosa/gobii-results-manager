@@ -3,8 +3,8 @@ import { requireAdminAuth } from '@/lib/adminAuth';
 import prisma from '@/lib/prisma';
 import { LeadStatus, Prisma } from '@prisma/client';
 
-// Terminal statuses that cannot be changed back to active
-const TERMINAL_STATUSES: LeadStatus[] = ['WON' as LeadStatus, 'LOST' as LeadStatus, 'DISCARDED' as LeadStatus];
+// Only WON and LOST are truly terminal; DISCARDED can be reopened
+const TERMINAL_STATUSES: LeadStatus[] = ['WON' as LeadStatus, 'LOST' as LeadStatus];
 
 // PATCH /api/admin/leads/[id]/status - Update lead status
 export async function PATCH(
@@ -98,6 +98,18 @@ export async function PATCH(
           toStatus: status,
           reason: reason || null,
           changedById: adminUser.id,
+        },
+      });
+
+      // Create audit trail entry
+      await tx.leadChange.create({
+        data: {
+          leadId: id,
+          field: "status",
+          fromValue: lead.status,
+          toValue: status,
+          reason: reason || null,
+          changedByUserId: adminUser.id,
         },
       });
 

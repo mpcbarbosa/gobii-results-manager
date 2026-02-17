@@ -93,6 +93,16 @@ export async function PATCH(
           },
         });
 
+        // Create audit trail entry
+        await tx.leadChange.create({
+          data: {
+            leadId: id,
+            field: "ownerId",
+            fromValue: lead.ownerId ?? null,
+            toValue: ownerId ?? null,
+          },
+        });
+
         return updatedLead;
       },
     );

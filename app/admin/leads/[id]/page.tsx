@@ -22,8 +22,8 @@ const LEAD_STATUSES = [
   'DISCARDED',
 ] as const;
 
-// Terminal statuses that cannot be changed
-const TERMINAL_STATUSES = ['WON', 'LOST', 'DISCARDED'];
+// Only WON and LOST are truly terminal; DISCARDED can be reopened
+const TERMINAL_STATUSES = ['WON', 'LOST'];
 
 type Activity = {
   id: string;
@@ -543,6 +543,31 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     >
                       descartar
                     </button>
+                    {lead.status === 'DISCARDED' && (
+                      <button
+                        disabled={saving}
+                        onClick={async () => {
+                          try {
+                            setSaving(true);
+                            setError(null);
+                            await adminFetch(`/api/admin/leads/${leadId}/status`, {
+                              method: 'PATCH',
+                              body: JSON.stringify({ status: 'NEW', reason: 'Reaberta via ação rápida' }),
+                            });
+                            setSuccess(true);
+                            setTimeout(() => setSuccess(false), 3000);
+                            await loadLead();
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : 'Erro');
+                          } finally {
+                            setSaving(false);
+                          }
+                        }}
+                        className="px-3 py-2 text-sm bg-amber-50 text-amber-700 border border-amber-200 rounded-md hover:bg-amber-100 disabled:opacity-50 col-span-2"
+                      >
+                        reabrir
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

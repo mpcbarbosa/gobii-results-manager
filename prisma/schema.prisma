@@ -227,6 +227,7 @@ model Lead {
   interactions      Interaction[]
   handoffs          Handoff[]
   activities        Activity[]
+  leadChanges       LeadChange[]
   ownerUser         User?     @relation("LeadOwner", fields: [ownerId], references: [id], onDelete: SetNull)
 
   @@index([sourceId])
@@ -291,6 +292,7 @@ model User {
   handoffsAccepted  Handoff[] @relation("HandoffAcceptedBy")
   activities        Activity[]
   ownedLeads        Lead[] @relation("LeadOwner")
+  leadChanges       LeadChange[] @relation("LeadChangeUser")
 
   @@index([email])
   @@index([role])
@@ -557,4 +559,23 @@ model AgentIngestAudit {
   @@index([createdAt])
   @@index([status])
   @@map("agent_ingest_audit")
+}
+
+// Lead Change Audit Log
+model LeadChange {
+  id              String   @id @default(uuid()) @db.Uuid
+  leadId          String   @map("lead_id") @db.Uuid
+  lead            Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  changedAt       DateTime @default(now()) @map("changed_at")
+  changedByUserId String?  @map("changed_by_user_id") @db.Uuid
+  changedByUser   User?    @relation("LeadChangeUser", fields: [changedByUserId], references: [id], onDelete: SetNull)
+  field           String   // e.g. "status", "ownerId", "stage"
+  fromValue       String?  @map("from_value")
+  toValue         String?  @map("to_value")
+  reason          String?  @db.Text
+  meta            Json?
+
+  @@index([leadId])
+  @@index([changedAt])
+  @@map("lead_changes")
 }
