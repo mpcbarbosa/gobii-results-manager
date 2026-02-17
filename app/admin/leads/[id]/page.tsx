@@ -441,6 +441,112 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             
             {/* Right Column - Actions */}
             <div className="space-y-6">
+              {/* Quick Actions */}
+              {!isTerminalStatus && (
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h2 className="text-lg font-bold mb-4">Ações rápidas</h2>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      disabled={saving}
+                      onClick={async () => {
+                        try {
+                          setSaving(true);
+                          setError(null);
+                          // Get owner from localStorage
+                          const myId = typeof window !== 'undefined' ? localStorage.getItem('gobii.myUserId') : null;
+                          if (myId) {
+                            await adminFetch(`/api/admin/leads/${leadId}/owner`, {
+                              method: 'PATCH',
+                              body: JSON.stringify({ ownerId: myId }),
+                            });
+                          }
+                          setSuccess(true);
+                          setTimeout(() => setSuccess(false), 3000);
+                          await loadLead();
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : 'Erro');
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                      className="px-3 py-2 text-sm bg-purple-50 text-purple-700 border border-purple-200 rounded-md hover:bg-purple-100 disabled:opacity-50"
+                    >
+                      assumir
+                    </button>
+                    <button
+                      disabled={saving}
+                      onClick={async () => {
+                        try {
+                          setSaving(true);
+                          setError(null);
+                          await adminFetch(`/api/admin/leads/${leadId}/status`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ status: 'QUALIFIED' }),
+                          });
+                          setSuccess(true);
+                          setTimeout(() => setSuccess(false), 3000);
+                          await loadLead();
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : 'Erro');
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                      className="px-3 py-2 text-sm bg-green-50 text-green-700 border border-green-200 rounded-md hover:bg-green-100 disabled:opacity-50"
+                    >
+                      qualificar
+                    </button>
+                    <button
+                      disabled={saving}
+                      onClick={async () => {
+                        try {
+                          setSaving(true);
+                          setError(null);
+                          await adminFetch(`/api/admin/leads/${leadId}/status`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ status: 'CONTACTED' }),
+                          });
+                          setSuccess(true);
+                          setTimeout(() => setSuccess(false), 3000);
+                          await loadLead();
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : 'Erro');
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                      className="px-3 py-2 text-sm bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 disabled:opacity-50"
+                    >
+                      contactado
+                    </button>
+                    <button
+                      disabled={saving}
+                      onClick={async () => {
+                        if (!confirm('Tem a certeza que quer descartar esta lead?')) return;
+                        try {
+                          setSaving(true);
+                          setError(null);
+                          await adminFetch(`/api/admin/leads/${leadId}/status`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ status: 'DISCARDED', reason: 'Descartado via ação rápida' }),
+                          });
+                          setSuccess(true);
+                          setTimeout(() => setSuccess(false), 3000);
+                          await loadLead();
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : 'Erro');
+                        } finally {
+                          setSaving(false);
+                        }
+                      }}
+                      className="px-3 py-2 text-sm bg-red-50 text-red-700 border border-red-200 rounded-md hover:bg-red-100 disabled:opacity-50"
+                    >
+                      descartar
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Status Update */}
               <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-lg font-bold mb-4">Update Status</h2>
